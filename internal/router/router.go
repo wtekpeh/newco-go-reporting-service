@@ -21,4 +21,12 @@ func Register(app *fiber.App, pool *pgxpool.Pool) {
 
 	reports := app.Group("/reports")
 	reports.Get("/executive-summary", reportHandler.ExecutiveSummary)
+	reports.Get("/recent-batches", reportHandler.RecentBatches)
+	reports.Get("/batch-trends", reportHandler.BatchTrends)
+	reports.Get("/branch-summary", reportHandler.BranchSummary)
+	reports.Get("/role-distribution", reportHandler.RoleDistribution)
+	reports.Get("/user-growth", reportHandler.UserGrowth)
+	reports.Get("/staff-summary", reportHandler.StaffSummary)
+	reports.Get("/batch-summary", reportHandler.BatchSummary)
+	reports.Get("/branch-trends", reportHandler.BranchTrends)
 }
