@@ -1,6 +1,7 @@
 package app
 
 import (
+	"newco-go-reporting-service/internal/config"
 	"newco-go-reporting-service/internal/router"
 
 	"github.com/gofiber/fiber/v2"
@@ -10,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func New(pool *pgxpool.Pool) *fiber.App {
+func New(cfg *config.Config, pool *pgxpool.Pool) *fiber.App {
 	app := fiber.New()
 
 	app.Use(recover.New())
@@ -21,7 +22,7 @@ func New(pool *pgxpool.Pool) *fiber.App {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
-	router.Register(app, pool)
+	router.Register(app, cfg, pool)
 
 	return app
 }
