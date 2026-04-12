@@ -146,3 +146,7 @@ func (s *ReportService) BatchSummary(filters dto.ReportFiltersDTO) (*dto.BatchSu
 func (s *ReportService) BranchTrends(filters dto.ReportFiltersDTO) ([]dto.BranchTrendSeriesDTO, error) {
 	return s.Repo.BranchTrends(filters)
 }
+
+func (s *ReportService) GetBranches() ([]dto.BranchItemDTO, error) {
+	return s.Repo.GetBranches()
+}

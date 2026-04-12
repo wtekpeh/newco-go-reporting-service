@@ -273,3 +273,17 @@ func (h *ReportHandler) BranchTrends(c *fiber.Ctx) error {
 
 	return c.JSON(response)
 }
+
+func (h *ReportHandler) Branches(c *fiber.Ctx) error {
+	items, err := h.Service.GetBranches()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to fetch branches",
+			Error:   err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"items": items,
+	})
+}

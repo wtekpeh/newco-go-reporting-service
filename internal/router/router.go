@@ -50,6 +50,7 @@ func Register(app *fiber.App, cfg *config.Config, pool *pgxpool.Pool) {
 	reports.Get("/staff-summary", reportHandler.StaffSummary)
 	reports.Get("/batch-summary", reportHandler.BatchSummary)
 	reports.Get("/branch-trends", reportHandler.BranchTrends)
+	reports.Get("/branches", reportHandler.Branches)
 
 	branchDashboard := app.Group(
 		"/branch-dashboard",

@@ -470,3 +470,31 @@ func (r *ReportRepository) BranchTrends(filters dto.ReportFiltersDTO) ([]dto.Bra
 
 	return series, nil
 }
+
+func (r *ReportRepository) GetBranches() ([]dto.BranchItemDTO, error) {
+	rows, err := r.DB.Query(context.Background(), `
+		SELECT id, name
+		FROM accounts_branch
+		WHERE is_active = TRUE
+		ORDER BY name ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []dto.BranchItemDTO
+
+	for rows.Next() {
+		var item dto.BranchItemDTO
+
+		err := rows.Scan(&item.ID, &item.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}

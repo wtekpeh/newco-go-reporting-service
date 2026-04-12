@@ -156,3 +156,8 @@ type BranchTrendsResponse struct {
 	Message string                 `json:"message"`
 	Series  []BranchTrendSeriesDTO `json:"series"`
 }
+
+type BranchItemDTO struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
