@@ -1,6 +1,13 @@
 package app
 
 import (
+	"context"
+	"time"
+
+	notificationsrepo "newco-go-reporting-service/internal/notifications/repositories"
+	notificationsservice "newco-go-reporting-service/internal/notifications/services"
+	notificationsworker "newco-go-reporting-service/internal/notifications/worker"
+
 	"newco-go-reporting-service/internal/config"
 	"newco-go-reporting-service/internal/router"
 
@@ -23,6 +30,12 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *fiber.App {
 	}))
 
 	router.Register(app, cfg, pool)
+
+	eventRepo := notificationsrepo.NewEventRepository(pool)
+	eventProcessor := notificationsservice.NewEventProcessorService(eventRepo)
+	eventWorker := notificationsworker.NewEventWorker(eventProcessor, 5*time.Second, 20)
+
+	go eventWorker.Start(context.Background())
 
 	return app
 }
