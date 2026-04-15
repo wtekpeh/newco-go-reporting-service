@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"newco-go-reporting-service/internal/config"
+	notificationsrealtime "newco-go-reporting-service/internal/notifications/realtime"
 	notificationsrepo "newco-go-reporting-service/internal/notifications/repositories"
 	notificationsservice "newco-go-reporting-service/internal/notifications/services"
 	notificationsworker "newco-go-reporting-service/internal/notifications/worker"
-
-	"newco-go-reporting-service/internal/config"
 	"newco-go-reporting-service/internal/router"
 
 	"github.com/gofiber/fiber/v2"
@@ -25,17 +25,20 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *fiber.App {
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "https://vite.williamtekpeh.com,http://localhost:5173,http://127.0.0.1:5173",
-		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
+		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
-	router.Register(app, cfg, pool)
+	hub := notificationsrealtime.NewHub()
+
+	router.Register(app, cfg, pool, hub)
 
 	eventRepo := notificationsrepo.NewEventRepository(pool)
 	notificationRepo := notificationsrepo.NewNotificationRepository(pool)
 	eventProcessor := notificationsservice.NewEventProcessorService(
 		eventRepo,
 		notificationRepo,
+		hub,
 	)
 	eventWorker := notificationsworker.NewEventWorker(
 		eventProcessor,

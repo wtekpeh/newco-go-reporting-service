@@ -2,9 +2,12 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"time"
 
 	notificationsdto "newco-go-reporting-service/internal/notifications/dto"
+	notificationsrealtime "newco-go-reporting-service/internal/notifications/realtime"
 	notificationsrepo "newco-go-reporting-service/internal/notifications/repositories"
 )
 
@@ -15,15 +18,18 @@ type EventProcessorService interface {
 type eventProcessorService struct {
 	eventRepo        notificationsrepo.EventRepository
 	notificationRepo notificationsrepo.NotificationRepository
+	hub              *notificationsrealtime.Hub
 }
 
 func NewEventProcessorService(
 	eventRepo notificationsrepo.EventRepository,
 	notificationRepo notificationsrepo.NotificationRepository,
+	hub *notificationsrealtime.Hub,
 ) EventProcessorService {
 	return &eventProcessorService{
 		eventRepo:        eventRepo,
 		notificationRepo: notificationRepo,
+		hub:              hub,
 	}
 }
 
@@ -62,12 +68,22 @@ func (s *eventProcessorService) processSingleEvent(
 	}
 
 	for _, recipientID := range recipientIDs {
-		if err := s.notificationRepo.InsertNotification(
+		notificationID, err := s.notificationRepo.InsertNotification(
 			ctx,
 			event.ID,
 			recipientID,
-		); err != nil {
+		)
+		if err != nil {
 			return err
+		}
+
+		if err := s.pushLiveNotification(event, recipientID, notificationID); err != nil {
+			log.Printf(
+				"[notifications] live push failed event_id=%d recipient_id=%d err=%v",
+				event.ID,
+				recipientID,
+				err,
+			)
 		}
 	}
 
@@ -132,4 +148,31 @@ func (s *eventProcessorService) shouldIncludeBranchManagers(
 	default:
 		return false
 	}
+}
+
+func (s *eventProcessorService) pushLiveNotification(
+	event notificationsdto.ActivityEvent,
+	recipientID int64,
+	notificationID int64,
+) error {
+	payload := notificationsdto.LiveNotificationMessage{
+		Type:           "notification",
+		NotificationID: notificationID,
+		EventID:        event.ID,
+		Action:         event.Action,
+		TargetType:     event.TargetType,
+		TargetID:       event.TargetID,
+		Message:        event.Message,
+		BranchID:       event.BranchID,
+		RecipientID:    recipientID,
+		CreatedAt:      time.Now().Format(time.RFC3339),
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	s.hub.SendToStaffProfile(recipientID, data)
+	return nil
 }

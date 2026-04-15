@@ -139,3 +139,45 @@ func (m *AuthMiddleware) RequireBranchManager() fiber.Handler {
 		return c.Next()
 	}
 }
+
+func (m *AuthMiddleware) RequireWebSocketAuth() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		tokenString := strings.TrimSpace(c.Query("token"))
+		if tokenString == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"detail": "missing token query parameter",
+			})
+		}
+
+		token, err := jwt.Parse(tokenString, m.jwks.Keyfunc, jwt.WithIssuer(m.issuer))
+		if err != nil || !token.Valid {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"detail": "invalid or expired token",
+			})
+		}
+
+		claimsMap, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"detail": "invalid token claims",
+			})
+		}
+
+		sub, ok := claimsMap["sub"].(string)
+		if !ok || strings.TrimSpace(sub) == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"detail": "token missing sub claim",
+			})
+		}
+
+		access, err := m.accessService.ResolveAccessContext(c.UserContext(), sub)
+		if err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"detail": "no active staff profile found for this token",
+			})
+		}
+
+		c.Locals(AccessContextKey, access)
+		return c.Next()
+	}
+}

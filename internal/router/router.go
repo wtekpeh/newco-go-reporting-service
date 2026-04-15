@@ -9,11 +9,23 @@ import (
 	"newco-go-reporting-service/internal/repositories"
 	"newco-go-reporting-service/internal/services"
 
+	notificationhandlers "newco-go-reporting-service/internal/notifications/handlers"
+	notificationsrealtime "newco-go-reporting-service/internal/notifications/realtime"
+	notificationsrepo "newco-go-reporting-service/internal/notifications/repositories"
+	notificationsservice "newco-go-reporting-service/internal/notifications/services"
+
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Register(app *fiber.App, cfg *config.Config, pool *pgxpool.Pool) {
+func Register(
+	app *fiber.App,
+	cfg *config.Config,
+	pool *pgxpool.Pool,
+	hub *notificationsrealtime.Hub,
+) {
+	_ = hub
 	healthHandler := handlers.NewHealthHandler(pool)
 
 	reportRepo := repositories.NewReportRepository(pool)
@@ -27,6 +39,12 @@ func Register(app *fiber.App, cfg *config.Config, pool *pgxpool.Pool) {
 	branchDashboardRepo := repositories.NewBranchDashboardRepository(pool)
 	branchDashboardService := services.NewBranchDashboardService(branchDashboardRepo)
 	branchDashboardHandler := handlers.NewBranchDashboardHandler(branchDashboardService)
+
+	notificationRepo := notificationsrepo.NewNotificationRepository(pool)
+	notificationService := notificationsservice.NewNotificationService(notificationRepo)
+	notificationHandler := notificationhandlers.NewNotificationHandler(notificationService)
+
+	notificationWSHandler := notificationhandlers.NewNotificationWebSocketHandler(hub)
 
 	authMiddleware, err := middleware.NewAuthMiddleware(cfg, accessService)
 	if err != nil {
@@ -62,4 +80,23 @@ func Register(app *fiber.App, cfg *config.Config, pool *pgxpool.Pool) {
 	branchDashboard.Get("/batch-trends", branchDashboardHandler.BatchTrends)
 	branchDashboard.Get("/role-distribution", branchDashboardHandler.RoleDistribution)
 	branchDashboard.Get("/recent-batches", branchDashboardHandler.RecentBatches)
+
+	notifications := app.Group(
+		"/notifications",
+		authMiddleware.RequireAuth(),
+	)
+
+	notifications.Get("/", notificationHandler.ListMyNotifications)
+	notifications.Get("/unread-count", notificationHandler.GetMyUnreadCount)
+	notifications.Patch("/:id/read", notificationHandler.MarkMyNotificationAsRead)
+
+	app.Use(
+		"/ws/notifications",
+		authMiddleware.RequireWebSocketAuth(),
+	)
+
+	app.Get(
+		"/ws/notifications",
+		websocket.New(notificationWSHandler.Handle),
+	)
 }

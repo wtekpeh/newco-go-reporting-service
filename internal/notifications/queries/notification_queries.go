@@ -28,9 +28,12 @@ INSERT INTO activity_notification (
     event_id,
     recipient_staff_profile_id,
     is_read,
+    read_at,
     emailed_at,
     created_at
 )
-VALUES ($1, $2, FALSE, NULL, NOW())
-ON CONFLICT (event_id, recipient_staff_profile_id) DO NOTHING
+VALUES ($1, $2, FALSE, NULL, NULL, NOW())
+ON CONFLICT (event_id, recipient_staff_profile_id)
+DO UPDATE SET recipient_staff_profile_id = activity_notification.recipient_staff_profile_id
+RETURNING id
 `
