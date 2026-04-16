@@ -38,6 +38,11 @@ type NotificationRepository interface {
 		notificationID int64,
 		recipientStaffProfileID int64,
 	) error
+
+	MarkAllNotificationsAsReadByRecipientID(
+		ctx context.Context,
+		recipientStaffProfileID int64,
+	) error
 }
 
 type notificationRepository struct {
@@ -213,4 +218,16 @@ func (r *notificationRepository) MarkNotificationAsRead(
 	}
 
 	return nil
+}
+
+func (r *notificationRepository) MarkAllNotificationsAsReadByRecipientID(
+	ctx context.Context,
+	recipientStaffProfileID int64,
+) error {
+	_, err := r.pool.Exec(
+		ctx,
+		queries.MarkAllNotificationsAsReadByRecipientID,
+		recipientStaffProfileID,
+	)
+	return err
 }

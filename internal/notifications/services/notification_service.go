@@ -25,6 +25,11 @@ type NotificationService interface {
 		access *dto.AccessContext,
 		notificationID int64,
 	) error
+
+	MarkAllMyNotificationsAsRead(
+		ctx context.Context,
+		access *dto.AccessContext,
+	) error
 }
 
 type notificationService struct {
@@ -67,6 +72,16 @@ func (s *notificationService) MarkMyNotificationAsRead(
 	return s.repo.MarkNotificationAsRead(
 		ctx,
 		notificationID,
+		access.StaffProfileID,
+	)
+}
+
+func (s *notificationService) MarkAllMyNotificationsAsRead(
+	ctx context.Context,
+	access *dto.AccessContext,
+) error {
+	return s.repo.MarkAllNotificationsAsReadByRecipientID(
+		ctx,
 		access.StaffProfileID,
 	)
 }

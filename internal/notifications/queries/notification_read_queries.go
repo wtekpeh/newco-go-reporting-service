@@ -43,3 +43,11 @@ SET
 WHERE id = $1
   AND recipient_staff_profile_id = $2
 `
+const MarkAllNotificationsAsReadByRecipientID = `
+UPDATE activity_notification
+SET
+    is_read = TRUE,
+    read_at = NOW()
+WHERE recipient_staff_profile_id = $1
+  AND is_read = FALSE
+`

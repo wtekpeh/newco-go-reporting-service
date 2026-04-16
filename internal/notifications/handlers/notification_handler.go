@@ -122,3 +122,27 @@ func (h *NotificationHandler) MarkMyNotificationAsRead(c *fiber.Ctx) error {
 		"message": "notification marked as read",
 	})
 }
+
+func (h *NotificationHandler) MarkAllMyNotificationsAsRead(c *fiber.Ctx) error {
+	value := c.Locals(accessContextKey)
+	access, ok := value.(*dto.AccessContext)
+	if !ok || access == nil {
+		return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{
+			Message: "access context missing",
+		})
+	}
+
+	if err := h.service.MarkAllMyNotificationsAsRead(
+		c.UserContext(),
+		access,
+	); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to mark all notifications as read",
+			Error:   err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "all notifications marked as read",
+	})
+}

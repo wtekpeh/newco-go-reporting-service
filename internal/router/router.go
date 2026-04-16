@@ -89,6 +89,7 @@ func Register(
 	notifications.Get("/", notificationHandler.ListMyNotifications)
 	notifications.Get("/unread-count", notificationHandler.GetMyUnreadCount)
 	notifications.Patch("/:id/read", notificationHandler.MarkMyNotificationAsRead)
+	notifications.Patch("/read-all", notificationHandler.MarkAllMyNotificationsAsRead)
 
 	app.Use(
 		"/ws/notifications",
