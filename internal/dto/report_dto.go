@@ -161,3 +161,11 @@ type BranchItemDTO struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
+
+type IngredientCategoryDailyDTO struct {
+	CategoryID       *int64  `json:"category_id"`
+	CategoryName     string  `json:"category_name"`
+	Unit             string  `json:"unit"`
+	TotalFinalValue  float64 `json:"total_final_value"`
+	TotalActualValue float64 `json:"total_actual_value"`
+}

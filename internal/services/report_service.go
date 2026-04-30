@@ -1,8 +1,10 @@
 package services
 
 import (
+	"context"
 	"newco-go-reporting-service/internal/dto"
 	"newco-go-reporting-service/internal/repositories"
+	"time"
 )
 
 type ReportService struct {
@@ -149,4 +151,12 @@ func (s *ReportService) BranchTrends(filters dto.ReportFiltersDTO) ([]dto.Branch
 
 func (s *ReportService) GetBranches() ([]dto.BranchItemDTO, error) {
 	return s.Repo.GetBranches()
+}
+
+func (s *ReportService) GetIngredientCategoryDaily(
+	ctx context.Context,
+	date time.Time,
+) ([]dto.IngredientCategoryDailyDTO, error) {
+
+	return s.Repo.GetIngredientCategoryDaily(ctx, date)
 }

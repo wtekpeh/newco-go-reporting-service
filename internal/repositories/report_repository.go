@@ -498,3 +498,36 @@ func (r *ReportRepository) GetBranches() ([]dto.BranchItemDTO, error) {
 
 	return items, nil
 }
+
+func (r *ReportRepository) GetIngredientCategoryDaily(
+	ctx context.Context,
+	date time.Time,
+) ([]dto.IngredientCategoryDailyDTO, error) {
+
+	rows, err := r.DB.Query(ctx, queries.IngredientCategoryDailyQuery, date)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []dto.IngredientCategoryDailyDTO{}
+
+	for rows.Next() {
+		var item dto.IngredientCategoryDailyDTO
+
+		err := rows.Scan(
+			&item.CategoryID,
+			&item.CategoryName,
+			&item.Unit,
+			&item.TotalFinalValue,
+			&item.TotalActualValue,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, item)
+	}
+
+	return results, nil
+}

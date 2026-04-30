@@ -69,6 +69,7 @@ func Register(
 	reports.Get("/batch-summary", reportHandler.BatchSummary)
 	reports.Get("/branch-trends", reportHandler.BranchTrends)
 	reports.Get("/branches", reportHandler.Branches)
+	reports.Get("/ingredient-categories/daily", reportHandler.IngredientCategoryDaily)
 
 	branchDashboard := app.Group(
 		"/branch-dashboard",

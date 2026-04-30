@@ -3,6 +3,7 @@ package handlers
 import (
 	"newco-go-reporting-service/internal/dto"
 	"newco-go-reporting-service/internal/services"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -285,5 +286,37 @@ func (h *ReportHandler) Branches(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"items": items,
+	})
+}
+
+func (h *ReportHandler) IngredientCategoryDaily(c *fiber.Ctx) error {
+
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "date query parameter is required",
+			Error:   "use format YYYY-MM-DD",
+		})
+	}
+
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid date format",
+			Error:   "use format YYYY-MM-DD",
+		})
+	}
+
+	items, err := h.Service.GetIngredientCategoryDaily(c.Context(), date)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to fetch ingredient category daily report",
+			Error:   err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "ingredient category daily report fetched successfully",
+		"items":   items,
 	})
 }

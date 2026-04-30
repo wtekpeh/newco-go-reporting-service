@@ -212,3 +212,39 @@ const BranchTrendsFlatQuery = `
 	GROUP BY b.id, b.name, DATE(cb.created_at)
 	ORDER BY b.name ASC, DATE(cb.created_at) ASC
 `
+const IngredientCategoryDailyQuery = `
+	SELECT
+		ic.id AS category_id,
+		COALESCE(ic.name, 'Uncategorized') AS category_name,
+
+		CASE
+			WHEN LOWER(cbi.ingredient) LIKE '%kenkey%' THEN 'pc'
+			WHEN LOWER(cbi.ingredient) LIKE '%oil%' THEN 'ml'
+			ELSE 'g'
+		END AS unit,
+
+		COALESCE(SUM(cbi.final_g), 0) AS total_final_value,
+		COALESCE(SUM(cbi.actual_g), 0) AS total_actual_value
+
+	FROM cooking_cookbatchitem cbi
+	JOIN cooking_cookbatch cb
+		ON cb.id = cbi.batch_id
+	JOIN recipes_recipeingredient ri
+		ON ri.recipe_id = cb.recipe_id
+		AND LOWER(ri.name) = LOWER(cbi.ingredient)
+	LEFT JOIN recipes_ingredientcategory ic
+		ON ic.id = ri.category_id
+
+	WHERE cb.used_date = $1
+
+	GROUP BY
+		ic.id,
+		ic.name,
+		CASE
+			WHEN LOWER(cbi.ingredient) LIKE '%kenkey%' THEN 'pc'
+			WHEN LOWER(cbi.ingredient) LIKE '%oil%' THEN 'ml'
+			ELSE 'g'
+		END
+
+	ORDER BY category_name ASC, unit ASC
+`
