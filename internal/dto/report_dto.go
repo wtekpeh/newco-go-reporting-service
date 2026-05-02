@@ -163,9 +163,28 @@ type BranchItemDTO struct {
 }
 
 type IngredientCategoryDailyDTO struct {
+	UsedDate         string  `json:"used_date"`
 	CategoryID       *int64  `json:"category_id"`
 	CategoryName     string  `json:"category_name"`
 	Unit             string  `json:"unit"`
 	TotalFinalValue  float64 `json:"total_final_value"`
 	TotalActualValue float64 `json:"total_actual_value"`
+}
+
+type BatchDetailItemDTO struct {
+	Ingredient  string  `json:"ingredient"`
+	Unit        string  `json:"unit"`
+	FinalValue  float64 `json:"final_value"`
+	ActualValue float64 `json:"actual_value"`
+}
+
+type BatchDetailExportDTO struct {
+	BatchID    int64                `json:"batch_id"`
+	RecipeName string               `json:"recipe_name"`
+	BranchName string               `json:"branch_name"`
+	CreatedBy  string               `json:"created_by"`
+	UsedDate   string               `json:"used_date"`
+	NPeople    int                  `json:"n_people"`
+	Status     string               `json:"status"`
+	Items      []BatchDetailItemDTO `json:"items"`
 }

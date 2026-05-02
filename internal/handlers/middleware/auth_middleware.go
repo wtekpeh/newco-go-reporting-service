@@ -181,3 +181,23 @@ func (m *AuthMiddleware) RequireWebSocketAuth() fiber.Handler {
 		return c.Next()
 	}
 }
+
+func (m *AuthMiddleware) RequireBatchAccess() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		value := c.Locals(AccessContextKey)
+		access, ok := value.(*dto.AccessContext)
+		if !ok || access == nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"detail": "access context missing",
+			})
+		}
+
+		if m.accessService.IsExecutive(access) || m.accessService.IsBranchManager(access) {
+			return c.Next()
+		}
+
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"detail": "executive or branch manager access required",
+		})
+	}
+}

@@ -214,6 +214,7 @@ const BranchTrendsFlatQuery = `
 `
 const IngredientCategoryDailyQuery = `
 	SELECT
+		TO_CHAR(cb.used_date, 'YYYY-MM-DD') AS used_date,
 		ic.id AS category_id,
 		COALESCE(ic.name, 'Uncategorized') AS category_name,
 
@@ -238,6 +239,7 @@ const IngredientCategoryDailyQuery = `
 	WHERE cb.used_date = $1
 
 	GROUP BY
+		cb.used_date::date,
 		ic.id,
 		ic.name,
 		CASE
@@ -247,4 +249,53 @@ const IngredientCategoryDailyQuery = `
 		END
 
 	ORDER BY category_name ASC, unit ASC
+`
+
+const BatchDetailExportHeaderQuery = `
+	SELECT
+		cb.id AS batch_id,
+		r.name AS recipe_name,
+		b.name AS branch_name,
+
+		COALESCE(
+			NULLIF(sp.full_name, ''),
+			NULLIF(sp.email, ''),
+			NULLIF(sp.username, ''),
+			sp.keycloak_sub
+		) AS created_by,
+
+		TO_CHAR(cb.used_date, 'YYYY-MM-DD') AS used_date,
+		cb.n_people,
+		cb.status
+
+	FROM cooking_cookbatch cb
+
+	JOIN recipes_recipe r
+		ON r.id = cb.recipe_id
+
+	LEFT JOIN accounts_branch b
+		ON b.id = cb.branch_id
+
+	LEFT JOIN accounts_staffprofile sp
+		ON sp.id = cb.created_by_id
+
+	WHERE cb.id = $1
+`
+
+const BatchDetailExportItemsQuery = `
+	SELECT
+		cbi.ingredient,
+
+		CASE
+			WHEN LOWER(cbi.ingredient) LIKE '%kenkey%' THEN 'pc'
+			WHEN LOWER(cbi.ingredient) LIKE '%oil%' THEN 'ml'
+			ELSE 'g'
+		END AS unit,
+
+		COALESCE(cbi.final_g, 0) AS final_value,
+		COALESCE(cbi.actual_g, 0) AS actual_value
+
+	FROM cooking_cookbatchitem cbi
+	WHERE cbi.batch_id = $1
+	ORDER BY cbi.ingredient ASC
 `

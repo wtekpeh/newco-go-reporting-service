@@ -56,20 +56,26 @@ func Register(
 
 	reports := app.Group("/reports",
 		authMiddleware.RequireAuth(),
-		authMiddleware.RequireExecutive(),
 	)
 
-	reports.Get("/executive-summary", reportHandler.ExecutiveSummary)
-	reports.Get("/recent-batches", reportHandler.RecentBatches)
-	reports.Get("/batch-trends", reportHandler.BatchTrends)
-	reports.Get("/branch-summary", reportHandler.BranchSummary)
-	reports.Get("/role-distribution", reportHandler.RoleDistribution)
-	reports.Get("/user-growth", reportHandler.UserGrowth)
-	reports.Get("/staff-summary", reportHandler.StaffSummary)
-	reports.Get("/batch-summary", reportHandler.BatchSummary)
-	reports.Get("/branch-trends", reportHandler.BranchTrends)
-	reports.Get("/branches", reportHandler.Branches)
-	reports.Get("/ingredient-categories/daily", reportHandler.IngredientCategoryDaily)
+	// No empty sub-groups here.
+	// Empty groups can behave like broad /reports middleware.
+
+	reports.Get("/executive-summary", authMiddleware.RequireExecutive(), reportHandler.ExecutiveSummary)
+	reports.Get("/recent-batches", authMiddleware.RequireExecutive(), reportHandler.RecentBatches)
+	reports.Get("/batch-trends", authMiddleware.RequireExecutive(), reportHandler.BatchTrends)
+	reports.Get("/branch-summary", authMiddleware.RequireExecutive(), reportHandler.BranchSummary)
+	reports.Get("/role-distribution", authMiddleware.RequireExecutive(), reportHandler.RoleDistribution)
+	reports.Get("/user-growth", authMiddleware.RequireExecutive(), reportHandler.UserGrowth)
+	reports.Get("/staff-summary", authMiddleware.RequireExecutive(), reportHandler.StaffSummary)
+	reports.Get("/batch-summary", authMiddleware.RequireExecutive(), reportHandler.BatchSummary)
+	reports.Get("/branch-trends", authMiddleware.RequireExecutive(), reportHandler.BranchTrends)
+	reports.Get("/branches", authMiddleware.RequireExecutive(), reportHandler.Branches)
+	reports.Get("/ingredient-categories/daily", authMiddleware.RequireExecutive(), reportHandler.IngredientCategoryDaily)
+	reports.Get("/ingredient-categories/daily/export/excel", authMiddleware.RequireExecutive(), reportHandler.ExportIngredientCategoryDailyExcel)
+
+	reports.Get("/batches/:id/export/excel", authMiddleware.RequireBatchAccess(), reportHandler.ExportBatchDetailExcel)
+	reports.Get("/batches/:id/export/pdf", authMiddleware.RequireBatchAccess(), reportHandler.ExportBatchDetailPDF)
 
 	branchDashboard := app.Group(
 		"/branch-dashboard",

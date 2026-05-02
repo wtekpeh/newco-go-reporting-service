@@ -3,6 +3,7 @@ package handlers
 import (
 	"newco-go-reporting-service/internal/dto"
 	"newco-go-reporting-service/internal/services"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -319,4 +320,87 @@ func (h *ReportHandler) IngredientCategoryDaily(c *fiber.Ctx) error {
 		"message": "ingredient category daily report fetched successfully",
 		"items":   items,
 	})
+}
+
+func (h *ReportHandler) ExportIngredientCategoryDailyExcel(c *fiber.Ctx) error {
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "date query parameter is required",
+			Error:   "use format YYYY-MM-DD",
+		})
+	}
+
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid date format",
+			Error:   "use format YYYY-MM-DD",
+		})
+	}
+
+	fileBytes, err := h.Service.ExportIngredientCategoryDailyExcel(c.Context(), date)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to export ingredient category daily excel",
+			Error:   err.Error(),
+		})
+	}
+
+	filename := "ingredient_category_daily_" + dateStr + ".xlsx"
+
+	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Set("Content-Disposition", "attachment; filename="+filename)
+
+	return c.Send(fileBytes)
+}
+
+func (h *ReportHandler) ExportBatchDetailExcel(c *fiber.Ctx) error {
+	batchID, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid batch id",
+			Error:   "batch id must be a number",
+		})
+	}
+
+	fileBytes, err := h.Service.ExportBatchDetailExcel(c.Context(), batchID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to export batch detail excel",
+			Error:   err.Error(),
+		})
+	}
+
+	filename := "batch_detail_" + strconv.FormatInt(batchID, 10) + ".xlsx"
+
+	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Set("Content-Disposition", "attachment; filename="+filename)
+
+	return c.Send(fileBytes)
+}
+
+func (h *ReportHandler) ExportBatchDetailPDF(c *fiber.Ctx) error {
+	batchID, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid batch id",
+			Error:   "batch id must be a number",
+		})
+	}
+
+	fileBytes, err := h.Service.ExportBatchDetailPDF(c.Context(), batchID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to export batch detail pdf",
+			Error:   err.Error(),
+		})
+	}
+
+	filename := "batch_detail_" + strconv.FormatInt(batchID, 10) + ".pdf"
+
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", "attachment; filename="+filename)
+
+	return c.Send(fileBytes)
 }

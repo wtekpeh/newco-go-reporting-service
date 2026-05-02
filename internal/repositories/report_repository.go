@@ -516,12 +516,14 @@ func (r *ReportRepository) GetIngredientCategoryDaily(
 		var item dto.IngredientCategoryDailyDTO
 
 		err := rows.Scan(
+			&item.UsedDate,
 			&item.CategoryID,
 			&item.CategoryName,
 			&item.Unit,
 			&item.TotalFinalValue,
 			&item.TotalActualValue,
 		)
+
 		if err != nil {
 			return nil, err
 		}
@@ -530,4 +532,53 @@ func (r *ReportRepository) GetIngredientCategoryDaily(
 	}
 
 	return results, nil
+}
+
+func (r *ReportRepository) GetBatchDetailExport(
+	ctx context.Context,
+	batchID int64,
+) (*dto.BatchDetailExportDTO, error) {
+
+	var result dto.BatchDetailExportDTO
+
+	err := r.DB.QueryRow(ctx, queries.BatchDetailExportHeaderQuery, batchID).Scan(
+		&result.BatchID,
+		&result.RecipeName,
+		&result.BranchName,
+		&result.CreatedBy,
+		&result.UsedDate,
+		&result.NPeople,
+		&result.Status,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.DB.Query(ctx, queries.BatchDetailExportItemsQuery, batchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []dto.BatchDetailItemDTO{}
+
+	for rows.Next() {
+		var item dto.BatchDetailItemDTO
+
+		err := rows.Scan(
+			&item.Ingredient,
+			&item.Unit,
+			&item.FinalValue,
+			&item.ActualValue,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	result.Items = items
+
+	return &result, nil
 }
