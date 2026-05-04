@@ -23,6 +23,34 @@ func NewReportService(repo *repositories.ReportRepository) *ReportService {
 	}
 }
 
+func exportDisplayUnit(unit string) string {
+	switch unit {
+	case "g":
+		return "kg"
+	case "ml":
+		return "L"
+	case "pc":
+		return "pcs"
+	case "pcs":
+		return "pcs"
+	default:
+		return unit
+	}
+}
+
+func exportDisplayValue(unit string, value float64) float64 {
+	switch unit {
+	case "g", "ml":
+		return value / 1000
+	default:
+		return value
+	}
+}
+
+func exportFloat3(value float64) string {
+	return strconv.FormatFloat(value, 'f', 3, 64)
+}
+
 func (s *ReportService) TotalUsers(filters dto.ReportFiltersDTO) (int, error) {
 	return s.Repo.TotalUsers(filters)
 }
@@ -184,9 +212,10 @@ func (s *ReportService) ExportIngredientCategoryDailyExcel(
 	headers := []string{
 		"Used Date",
 		"Category",
-		"Unit",
+		"Base Unit",
 		"Total Final",
-		"Total Actual",
+		"Display Unit",
+		"Display Final",
 	}
 
 	for index, header := range headers {
@@ -200,8 +229,9 @@ func (s *ReportService) ExportIngredientCategoryDailyExcel(
 		file.SetCellValue(sheet, "A"+strconv.Itoa(excelRow), row.UsedDate)
 		file.SetCellValue(sheet, "B"+strconv.Itoa(excelRow), row.CategoryName)
 		file.SetCellValue(sheet, "C"+strconv.Itoa(excelRow), row.Unit)
-		file.SetCellValue(sheet, "D"+strconv.Itoa(excelRow), row.TotalFinalValue)
-		file.SetCellValue(sheet, "E"+strconv.Itoa(excelRow), row.TotalActualValue)
+		file.SetCellValue(sheet, "D"+strconv.Itoa(excelRow), exportFloat3(row.TotalFinalValue))
+		file.SetCellValue(sheet, "E"+strconv.Itoa(excelRow), exportDisplayUnit(row.Unit))
+		file.SetCellValue(sheet, "F"+strconv.Itoa(excelRow), exportFloat3(exportDisplayValue(row.Unit, row.TotalFinalValue)))
 	}
 
 	buffer, err := file.WriteToBuffer()
@@ -251,9 +281,10 @@ func (s *ReportService) ExportBatchDetailExcel(
 	// Table headers
 	headers := []string{
 		"Ingredient",
-		"Unit",
+		"Base Unit",
 		"Final",
-		"Actual",
+		"Display Unit",
+		"Display Final",
 	}
 
 	for index, header := range headers {
@@ -267,8 +298,9 @@ func (s *ReportService) ExportBatchDetailExcel(
 
 		file.SetCellValue(sheet, "A"+strconv.Itoa(row), item.Ingredient)
 		file.SetCellValue(sheet, "B"+strconv.Itoa(row), item.Unit)
-		file.SetCellValue(sheet, "C"+strconv.Itoa(row), item.FinalValue)
-		file.SetCellValue(sheet, "D"+strconv.Itoa(row), item.ActualValue)
+		file.SetCellValue(sheet, "C"+strconv.Itoa(row), exportFloat3(item.FinalValue))
+		file.SetCellValue(sheet, "D"+strconv.Itoa(row), exportDisplayUnit(item.Unit))
+		file.SetCellValue(sheet, "E"+strconv.Itoa(row), exportFloat3(exportDisplayValue(item.Unit, item.FinalValue)))
 	}
 
 	buffer, err := file.WriteToBuffer()
@@ -358,14 +390,23 @@ func (s *ReportService) ExportBatchDetailPDF(
 	row("Status:", batch.Status, "", "")
 	pdf.Ln(8)
 
+	const (
+		colIngredient   = 78.0
+		colBaseUnit     = 24.0
+		colFinal        = 28.0
+		colDisplayUnit  = 26.0
+		colDisplayFinal = 30.0
+	)
+
 	// Table header helper
 	writeTableHeader := func() {
 		pdf.SetFont("Arial", "B", 11)
 
-		pdf.CellFormat(96, 8, "Ingredient", "1", 0, "", false, 0, "")
-		pdf.CellFormat(20, 8, "Unit", "1", 0, "C", false, 0, "")
-		pdf.CellFormat(35, 8, "Final", "1", 0, "R", false, 0, "")
-		pdf.CellFormat(35, 8, "Actual", "1", 1, "R", false, 0, "")
+		pdf.CellFormat(colIngredient, 8, "Ingredient", "1", 0, "", false, 0, "")
+		pdf.CellFormat(colBaseUnit, 8, "Base Unit", "1", 0, "C", false, 0, "")
+		pdf.CellFormat(colFinal, 8, "Final", "1", 0, "R", false, 0, "")
+		pdf.CellFormat(colDisplayUnit, 8, "Display Unit", "1", 0, "C", false, 0, "")
+		pdf.CellFormat(colDisplayFinal, 8, "Display Final", "1", 1, "R", false, 0, "")
 
 		pdf.SetFont("Arial", "", 10)
 	}
@@ -382,10 +423,11 @@ func (s *ReportService) ExportBatchDetailPDF(
 			writeTableHeader()
 		}
 
-		pdf.CellFormat(96, 7, item.Ingredient, "1", 0, "", false, 0, "")
-		pdf.CellFormat(20, 7, item.Unit, "1", 0, "C", false, 0, "")
-		pdf.CellFormat(35, 7, strconv.FormatFloat(item.FinalValue, 'f', 2, 64), "1", 0, "R", false, 0, "")
-		pdf.CellFormat(35, 7, strconv.FormatFloat(item.ActualValue, 'f', 2, 64), "1", 1, "R", false, 0, "")
+		pdf.CellFormat(colIngredient, 7, item.Ingredient, "1", 0, "", false, 0, "")
+		pdf.CellFormat(colBaseUnit, 7, item.Unit, "1", 0, "C", false, 0, "")
+		pdf.CellFormat(colFinal, 7, exportFloat3(item.FinalValue), "1", 0, "R", false, 0, "")
+		pdf.CellFormat(colDisplayUnit, 7, exportDisplayUnit(item.Unit), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(colDisplayFinal, 7, exportFloat3(exportDisplayValue(item.Unit, item.FinalValue)), "1", 1, "R", false, 0, "")
 	}
 
 	var buf bytes.Buffer
