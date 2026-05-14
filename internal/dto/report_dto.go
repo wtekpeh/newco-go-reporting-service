@@ -188,3 +188,14 @@ type BatchDetailExportDTO struct {
 	Status     string               `json:"status"`
 	Items      []BatchDetailItemDTO `json:"items"`
 }
+
+type TopRecipeVarianceItem struct {
+	RecipeID         int64   `json:"recipe_id"`
+	RecipeName       string  `json:"recipe_name"`
+	AverageVarianceG float64 `json:"average_variance_g"`
+	TotalBatches     int64   `json:"total_batches"`
+}
+
+type TopRecipeVarianceResponse struct {
+	Items []TopRecipeVarianceItem `json:"items"`
+}

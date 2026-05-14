@@ -141,7 +141,13 @@ func (s *eventProcessorService) shouldIncludeBranchManagers(
 	event notificationsdto.ActivityEvent,
 ) bool {
 	switch event.Action {
-	case "cook_batch_created", "cook_batch_actuals_updated", "cook_batch_finalized":
+	case "cook_batch_created",
+		"cook_batch_actuals_updated",
+		"cook_batch_finalized",
+
+		"daily_plan_created",
+		"daily_plan_actuals_updated",
+		"daily_plan_finalized":
 		return true
 	case "ingredient_scales_recalibrated":
 		return false

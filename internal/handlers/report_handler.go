@@ -404,3 +404,23 @@ func (h *ReportHandler) ExportBatchDetailPDF(c *fiber.Ctx) error {
 
 	return c.Send(fileBytes)
 }
+
+func (h *ReportHandler) GetTopRecipeVariance(c *fiber.Ctx) error {
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
+	branchID := c.Query("branch_id", "")
+
+	result, err := h.Service.GetTopRecipeVariance(
+		c.Context(),
+		startDate,
+		endDate,
+		branchID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"detail": err.Error(),
+		})
+	}
+
+	return c.JSON(result)
+}

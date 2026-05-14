@@ -69,6 +69,7 @@ func Register(
 	reports.Get("/user-growth", authMiddleware.RequireExecutive(), reportHandler.UserGrowth)
 	reports.Get("/staff-summary", authMiddleware.RequireExecutive(), reportHandler.StaffSummary)
 	reports.Get("/batch-summary", authMiddleware.RequireExecutive(), reportHandler.BatchSummary)
+	reports.Get("/top-recipe-variance", authMiddleware.RequireExecutive(), reportHandler.GetTopRecipeVariance)
 	reports.Get("/branch-trends", authMiddleware.RequireExecutive(), reportHandler.BranchTrends)
 	reports.Get("/branches", authMiddleware.RequireExecutive(), reportHandler.Branches)
 	reports.Get("/ingredient-categories/daily", authMiddleware.RequireExecutive(), reportHandler.IngredientCategoryDaily)

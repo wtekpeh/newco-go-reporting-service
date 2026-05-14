@@ -582,3 +582,42 @@ func (r *ReportRepository) GetBatchDetailExport(
 
 	return &result, nil
 }
+
+func (r *ReportRepository) GetTopRecipeVariance(
+	ctx context.Context,
+	startDate string,
+	endDate string,
+	branchID string,
+) ([]dto.TopRecipeVarianceItem, error) {
+	rows, err := r.DB.Query(
+		ctx,
+		queries.TopRecipeVarianceQuery,
+		startDate,
+		endDate,
+		branchID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []dto.TopRecipeVarianceItem{}
+
+	for rows.Next() {
+		var item dto.TopRecipeVarianceItem
+
+		err := rows.Scan(
+			&item.RecipeID,
+			&item.RecipeName,
+			&item.AverageVarianceG,
+			&item.TotalBatches,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}

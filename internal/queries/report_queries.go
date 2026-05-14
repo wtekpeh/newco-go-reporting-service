@@ -299,3 +299,47 @@ const BatchDetailExportItemsQuery = `
 	WHERE cbi.batch_id = $1
 	ORDER BY cbi.ingredient ASC
 `
+
+const TopRecipeVarianceQuery = `
+	SELECT
+		r.id AS recipe_id,
+		r.name AS recipe_name,
+
+		ROUND(
+			AVG(
+				ABS(
+					COALESCE(cbi.actual_g, 0) -
+					COALESCE(cbi.final_g, 0)
+				)
+			)::numeric,
+			3
+		) AS average_variance_g,
+
+		COUNT(DISTINCT cb.id) AS total_batches
+
+	FROM cooking_cookbatchitem cbi
+
+	JOIN cooking_cookbatch cb
+		ON cb.id = cbi.batch_id
+
+	JOIN recipes_recipe r
+		ON r.id = cb.recipe_id
+
+	WHERE cb.status = 'final'
+
+		AND cbi.actual_g IS NOT NULL
+
+		AND ($1 = '' OR DATE(cb.created_at) >= $1::date)
+		AND ($2 = '' OR DATE(cb.created_at) <= $2::date)
+		AND ($3 = '' OR cb.branch_id::text = $3)
+
+	GROUP BY r.id, r.name
+
+	HAVING COUNT(DISTINCT cb.id) > 0
+
+	ORDER BY average_variance_g DESC,
+	         total_batches DESC,
+	         r.name ASC
+
+	LIMIT 10
+`

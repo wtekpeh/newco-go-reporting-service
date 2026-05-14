@@ -438,3 +438,25 @@ func (s *ReportService) ExportBatchDetailPDF(
 
 	return buf.Bytes(), nil
 }
+
+func (s *ReportService) GetTopRecipeVariance(
+	ctx context.Context,
+	startDate string,
+	endDate string,
+	branchID string,
+) (*dto.TopRecipeVarianceResponse, error) {
+
+	items, err := s.Repo.GetTopRecipeVariance(
+		ctx,
+		startDate,
+		endDate,
+		branchID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.TopRecipeVarianceResponse{
+		Items: items,
+	}, nil
+}
