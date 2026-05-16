@@ -71,12 +71,19 @@ func Register(
 	reports.Get("/batch-summary", authMiddleware.RequireExecutive(), reportHandler.BatchSummary)
 	reports.Get("/top-recipe-variance", authMiddleware.RequireExecutive(), reportHandler.GetTopRecipeVariance)
 	reports.Get("/branch-trends", authMiddleware.RequireExecutive(), reportHandler.BranchTrends)
+	reports.Get("/daily-plan-trends", authMiddleware.RequireExecutive(), reportHandler.DailyPlanTrends)
+	reports.Get("/recent-daily-plans", authMiddleware.RequireExecutive(), reportHandler.RecentDailyPlans)
 	reports.Get("/branches", authMiddleware.RequireExecutive(), reportHandler.Branches)
 	reports.Get("/ingredient-categories/daily", authMiddleware.RequireExecutive(), reportHandler.IngredientCategoryDaily)
 	reports.Get("/ingredient-categories/daily/export/excel", authMiddleware.RequireExecutive(), reportHandler.ExportIngredientCategoryDailyExcel)
+	reports.Get(
+		"/ingredient-categories/daily/export/pdf", authMiddleware.RequireExecutive(),
+		reportHandler.ExportIngredientCategoryDailyPDF,
+	)
 
 	reports.Get("/batches/:id/export/excel", authMiddleware.RequireBatchAccess(), reportHandler.ExportBatchDetailExcel)
 	reports.Get("/batches/:id/export/pdf", authMiddleware.RequireBatchAccess(), reportHandler.ExportBatchDetailPDF)
+	reports.Get("/daily-plans/:id/export/pdf", authMiddleware.RequireBatchAccess(), reportHandler.DailyPlanRequisitionPDF)
 
 	branchDashboard := app.Group(
 		"/branch-dashboard",
@@ -86,6 +93,7 @@ func Register(
 
 	branchDashboard.Get("/summary", branchDashboardHandler.Summary)
 	branchDashboard.Get("/batch-trends", branchDashboardHandler.BatchTrends)
+	branchDashboard.Get("/daily-plan-trends", branchDashboardHandler.DailyPlanTrends)
 	branchDashboard.Get("/role-distribution", branchDashboardHandler.RoleDistribution)
 	branchDashboard.Get("/recent-batches", branchDashboardHandler.RecentBatches)
 

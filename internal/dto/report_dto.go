@@ -39,12 +39,15 @@ type ExecutiveHighlightsDTO struct {
 }
 
 type ExecutiveKpisDTO struct {
-	TotalUsers       int `json:"total_users"`
-	TotalActiveUsers int `json:"total_active_users"`
-	TotalBranches    int `json:"total_branches"`
-	TotalBatches     int `json:"total_batches"`
-	BatchesThisWeek  int `json:"batches_this_week"`
-	BatchesThisMonth int `json:"batches_this_month"`
+	TotalUsers          int `json:"total_users"`
+	TotalActiveUsers    int `json:"total_active_users"`
+	TotalBranches       int `json:"total_branches"`
+	TotalBatches        int `json:"total_batches"`
+	BatchesThisWeek     int `json:"batches_this_week"`
+	BatchesThisMonth    int `json:"batches_this_month"`
+	TotalDailyPlans     int `json:"total_daily_plans"`
+	FinalizedDailyPlans int `json:"finalized_daily_plans"`
+	DraftDailyPlans     int `json:"draft_daily_plans"`
 }
 
 type RecentBatchItemDTO struct {
@@ -198,4 +201,47 @@ type TopRecipeVarianceItem struct {
 
 type TopRecipeVarianceResponse struct {
 	Items []TopRecipeVarianceItem `json:"items"`
+}
+
+type DailyPlanTrendPointDTO struct {
+	Label string `json:"label"`
+	Count int    `json:"count"`
+}
+
+type DailyPlanTrendsResponse struct {
+	Message string                   `json:"message"`
+	Series  []DailyPlanTrendPointDTO `json:"series"`
+}
+
+type RecentDailyPlanItemDTO struct {
+	DailyPlanID int    `json:"daily_plan_id"`
+	BranchName  string `json:"branch_name"`
+	CreatedBy   string `json:"created_by"`
+	PlanDate    string `json:"plan_date"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type RecentDailyPlansResponse struct {
+	Message string                   `json:"message"`
+	Items   []RecentDailyPlanItemDTO `json:"items"`
+}
+
+type DailyPlanRequisitionItemDTO struct {
+	Ingredient string  `json:"ingredient"`
+	Group      string  `json:"group"`
+	Unit       string  `json:"unit"`
+	Quantity   float64 `json:"quantity"`
+}
+
+type DailyPlanRequisitionExportDTO struct {
+	DailyPlanID int64 `json:"daily_plan_id"`
+
+	BranchName string `json:"branch_name"`
+	CreatedBy  string `json:"created_by"`
+
+	UsedDate string `json:"used_date"`
+	Status   string `json:"status"`
+
+	Items []DailyPlanRequisitionItemDTO `json:"items"`
 }

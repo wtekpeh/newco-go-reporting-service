@@ -15,6 +15,7 @@ type BranchDashboardService interface {
 	GetBatchTrends(ctx context.Context, access *dto.AccessContext) ([]dto.BatchTrendPointDTO, error)
 	GetRoleDistribution(ctx context.Context, access *dto.AccessContext) ([]dto.RoleDistributionItemDTO, error)
 	GetRecentBatches(ctx context.Context, access *dto.AccessContext) ([]dto.RecentBatchItemDTO, error)
+	GetDailyPlanTrends(ctx context.Context, access *dto.AccessContext) ([]dto.BatchTrendPointDTO, error)
 }
 
 type branchDashboardService struct {
@@ -79,4 +80,17 @@ func (s *branchDashboardService) GetRecentBatches(
 	branchID := access.BranchIDs[0]
 
 	return s.repo.GetRecentBatches(ctx, branchID)
+}
+
+func (s *branchDashboardService) GetDailyPlanTrends(
+	ctx context.Context,
+	access *dto.AccessContext,
+) ([]dto.BatchTrendPointDTO, error) {
+	if access == nil || len(access.BranchIDs) == 0 {
+		return nil, ErrNoBranchScope
+	}
+
+	branchID := access.BranchIDs[0]
+
+	return s.repo.GetDailyPlanTrends(ctx, branchID)
 }

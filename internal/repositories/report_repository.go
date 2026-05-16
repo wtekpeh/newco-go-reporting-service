@@ -501,10 +501,16 @@ func (r *ReportRepository) GetBranches() ([]dto.BranchItemDTO, error) {
 
 func (r *ReportRepository) GetIngredientCategoryDaily(
 	ctx context.Context,
-	date time.Time,
+	startDate time.Time,
+	endDate time.Time,
 ) ([]dto.IngredientCategoryDailyDTO, error) {
 
-	rows, err := r.DB.Query(ctx, queries.IngredientCategoryDailyQuery, date)
+	rows, err := r.DB.Query(
+		ctx,
+		queries.IngredientCategoryDailyQuery,
+		startDate,
+		endDate,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -620,4 +626,184 @@ func (r *ReportRepository) GetTopRecipeVariance(
 	}
 
 	return items, rows.Err()
+}
+
+func (r *ReportRepository) TotalDailyPlans(filters dto.ReportFiltersDTO) (int, error) {
+	var count int
+
+	err := r.DB.QueryRow(
+		context.Background(),
+		queries.TotalDailyPlansQuery,
+		filters.BranchID,
+	).Scan(&count)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (r *ReportRepository) FinalizedDailyPlans(filters dto.ReportFiltersDTO) (int, error) {
+	var count int
+
+	err := r.DB.QueryRow(
+		context.Background(),
+		queries.FinalizedDailyPlansQuery,
+		filters.BranchID,
+	).Scan(&count)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (r *ReportRepository) DraftDailyPlans(filters dto.ReportFiltersDTO) (int, error) {
+	var count int
+
+	err := r.DB.QueryRow(
+		context.Background(),
+		queries.DraftDailyPlansQuery,
+		filters.BranchID,
+	).Scan(&count)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (r *ReportRepository) DailyPlanTrends(filters dto.ReportFiltersDTO) ([]dto.DailyPlanTrendPointDTO, error) {
+	rows, err := r.DB.Query(
+		context.Background(),
+		queries.DailyPlanTrendsQuery,
+		filters.StartDate,
+		filters.EndDate,
+		filters.BranchID,
+		filters.GroupBy,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []dto.DailyPlanTrendPointDTO
+
+	for rows.Next() {
+		var item dto.DailyPlanTrendPointDTO
+
+		err := rows.Scan(&item.Label, &item.Count)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
+func (r *ReportRepository) RecentDailyPlans(filters dto.ReportFiltersDTO) ([]dto.RecentDailyPlanItemDTO, error) {
+	rows, err := r.DB.Query(
+		context.Background(),
+		queries.RecentDailyPlansQuery,
+		filters.StartDate,
+		filters.EndDate,
+		filters.BranchID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []dto.RecentDailyPlanItemDTO
+
+	for rows.Next() {
+		var item dto.RecentDailyPlanItemDTO
+		var planDate time.Time
+		var createdAt time.Time
+
+		err := rows.Scan(
+			&item.DailyPlanID,
+			&item.BranchName,
+			&item.CreatedBy,
+			&planDate,
+			&item.Status,
+			&createdAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		item.PlanDate = planDate.Format("2006-01-02")
+		item.CreatedAt = createdAt.Format(time.RFC3339)
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
+func (r *ReportRepository) DailyPlanRequisitionExport(
+	ctx context.Context,
+	dailyPlanID int64,
+) (*dto.DailyPlanRequisitionExportDTO, error) {
+
+	rows, err := r.DB.Query(
+		ctx,
+		queries.DailyPlanRequisitionPDFQuery,
+		dailyPlanID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result dto.DailyPlanRequisitionExportDTO
+	items := []dto.DailyPlanRequisitionItemDTO{}
+
+	for rows.Next() {
+		var item dto.DailyPlanRequisitionItemDTO
+		var usedDate time.Time
+		var adjustedTotalKG float64
+
+		err := rows.Scan(
+			&result.DailyPlanID,
+			&usedDate,
+			&result.Status,
+			&result.BranchName,
+			&result.CreatedBy,
+			&item.Ingredient,
+			&item.Group,
+			&item.Quantity,
+			&adjustedTotalKG,
+			&item.Unit,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		result.UsedDate = usedDate.Format("2006-01-02")
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result.Items = items
+
+	return &result, nil
 }

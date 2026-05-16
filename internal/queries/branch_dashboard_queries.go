@@ -32,8 +32,28 @@ const BranchDashboardSummaryQuery = `
 			FROM cooking_cookbatch cb
 			WHERE cb.branch_id = $1
 			  AND cb.created_at >= date_trunc('month', CURRENT_DATE)
-		), 0) AS batches_this_month
-	`
+		), 0) AS batches_this_month,
+
+		COALESCE((
+			SELECT COUNT(*)
+			FROM cooking_dailyconsumptionplan dp
+			WHERE dp.branch_id = $1
+		), 0) AS total_daily_plans,
+
+		COALESCE((
+			SELECT COUNT(*)
+			FROM cooking_dailyconsumptionplan dp
+			WHERE dp.branch_id = $1
+			  AND dp.status = 'final'
+		), 0) AS finalized_daily_plans,
+
+		COALESCE((
+			SELECT COUNT(*)
+			FROM cooking_dailyconsumptionplan dp
+			WHERE dp.branch_id = $1
+			  AND dp.status = 'draft'
+		), 0) AS draft_daily_plans
+`
 
 const BranchBatchTrendsQuery = `
 	WITH grouped_batches AS (
@@ -74,4 +94,57 @@ const BranchRecentBatchesQuery = `
 	WHERE cb.branch_id = $1
 	ORDER BY cb.created_at DESC
 	LIMIT 10
+`
+
+const BranchTotalDailyPlansQuery = `
+	SELECT COUNT(*)
+	FROM cooking_dailyconsumptionplan
+	WHERE branch_id = $1
+`
+
+const BranchFinalizedDailyPlansQuery = `
+	SELECT COUNT(*)
+	FROM cooking_dailyconsumptionplan
+	WHERE branch_id = $1
+	AND status = 'final'
+`
+
+const BranchDraftDailyPlansQuery = `
+	SELECT COUNT(*)
+	FROM cooking_dailyconsumptionplan
+	WHERE branch_id = $1
+	AND status = 'draft'
+`
+
+const BranchRecentDailyPlansQuery = `
+	SELECT
+		dp.id,
+		dp.used_date,
+		dp.status,
+		COALESCE(sp.full_name, sp.email, sp.username, sp.keycloak_sub) AS created_by,
+		dp.created_at
+	FROM cooking_dailyconsumptionplan dp
+	LEFT JOIN accounts_staffprofile sp
+		ON sp.id = dp.created_by_id
+	WHERE dp.branch_id = $1
+	ORDER BY dp.created_at DESC
+	LIMIT 10
+`
+
+const BranchDailyPlanTrendsQuery = `
+	WITH grouped_daily_plans AS (
+		SELECT
+			DATE_TRUNC('day', created_at) AS grouped_date
+		FROM cooking_dailyconsumptionplan
+		WHERE branch_id = $1
+	)
+
+	SELECT
+		TO_CHAR(grouped_date, 'YYYY-MM-DD') AS label,
+		COUNT(*) AS count
+
+	FROM grouped_daily_plans
+
+	GROUP BY grouped_date
+	ORDER BY grouped_date ASC
 `

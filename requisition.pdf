@@ -1,0 +1,1 @@
+{"message":"failed to export requisition pdf","error":"can't scan into dest[1] (col: used_date): cannot scan date (OID 1082) in binary format into *string"}

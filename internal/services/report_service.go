@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"newco-go-reporting-service/internal/dto"
 	"newco-go-reporting-service/internal/repositories"
 	"strconv"
@@ -189,18 +190,28 @@ func (s *ReportService) GetBranches() ([]dto.BranchItemDTO, error) {
 
 func (s *ReportService) GetIngredientCategoryDaily(
 	ctx context.Context,
-	date time.Time,
+	startDate time.Time,
+	endDate time.Time,
 ) ([]dto.IngredientCategoryDailyDTO, error) {
 
-	return s.Repo.GetIngredientCategoryDaily(ctx, date)
+	return s.Repo.GetIngredientCategoryDaily(
+		ctx,
+		startDate,
+		endDate,
+	)
 }
 
 func (s *ReportService) ExportIngredientCategoryDailyExcel(
 	ctx context.Context,
-	date time.Time,
+	startDate time.Time,
+	endDate time.Time,
 ) ([]byte, error) {
 
-	rows, err := s.Repo.GetIngredientCategoryDaily(ctx, date)
+	rows, err := s.Repo.GetIngredientCategoryDaily(
+		ctx,
+		startDate,
+		endDate,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +246,142 @@ func (s *ReportService) ExportIngredientCategoryDailyExcel(
 	}
 
 	buffer, err := file.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func (s *ReportService) ExportIngredientCategoryDailyPDF(
+	ctx context.Context,
+	startDate time.Time,
+	endDate time.Time,
+) ([]byte, error) {
+
+	rows, err := s.Repo.GetIngredientCategoryDaily(
+		ctx,
+		startDate,
+		endDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	pdf := gofpdf.New("L", "mm", "A4", "")
+	pdf.SetMargins(12, 12, 12)
+	pdf.AddPage()
+
+	logoPath := "assets/newco-logo.png"
+
+	pdf.ImageOptions(
+		logoPath,
+		12,
+		10,
+		45,
+		0,
+		false,
+		gofpdf.ImageOptions{
+			ImageType: "PNG",
+			ReadDpi:   true,
+		},
+		0,
+		"",
+	)
+
+	pdf.SetY(22)
+	pdf.SetFont("Arial", "B", 16)
+
+	title := fmt.Sprintf(
+		"Ingredient Category Report (%s to %s)",
+		startDate.Format("2006-01-02"),
+		endDate.Format("2006-01-02"),
+	)
+
+	pdf.CellFormat(
+		0,
+		10,
+		title,
+		"",
+		1,
+		"C",
+		false,
+		0,
+		"",
+	)
+
+	pdf.SetDrawColor(200, 200, 200)
+	pdf.Line(12, 32, 285, 32)
+
+	pdf.Ln(6)
+
+	const (
+		colDate     = 35.0
+		colCategory = 70.0
+		colUnit     = 25.0
+		colFinal    = 60.0
+		colActual   = 60.0
+	)
+
+	writeHeader := func() {
+		pdf.SetFont("Arial", "B", 11)
+
+		pdf.CellFormat(colDate, 8, "Used Date", "1", 0, "", false, 0, "")
+		pdf.CellFormat(colCategory, 8, "Category", "1", 0, "", false, 0, "")
+		pdf.CellFormat(colUnit, 8, "Unit", "1", 0, "C", false, 0, "")
+		pdf.CellFormat(colFinal, 8, "Total Final", "1", 0, "R", false, 0, "")
+		pdf.CellFormat(colActual, 8, "Total Actual", "1", 1, "R", false, 0, "")
+
+		pdf.SetFont("Arial", "", 10)
+	}
+
+	writeHeader()
+
+	for _, row := range rows {
+
+		if pdf.GetY() > 190 {
+			pdf.AddPage()
+			pdf.SetY(20)
+			writeHeader()
+		}
+
+		finalValue := exportDisplayValue(row.Unit, row.TotalFinalValue)
+		actualValue := exportDisplayValue(row.Unit, row.TotalActualValue)
+
+		displayUnit := exportDisplayUnit(row.Unit)
+
+		pdf.CellFormat(colDate, 8, row.UsedDate, "1", 0, "", false, 0, "")
+		pdf.CellFormat(colCategory, 8, row.CategoryName, "1", 0, "", false, 0, "")
+		pdf.CellFormat(colUnit, 8, displayUnit, "1", 0, "C", false, 0, "")
+
+		pdf.CellFormat(
+			colFinal,
+			8,
+			exportFloat3(finalValue),
+			"1",
+			0,
+			"R",
+			false,
+			0,
+			"",
+		)
+
+		pdf.CellFormat(
+			colActual,
+			8,
+			exportFloat3(actualValue),
+			"1",
+			1,
+			"R",
+			false,
+			0,
+			"",
+		)
+	}
+
+	var buffer bytes.Buffer
+
+	err = pdf.Output(&buffer)
 	if err != nil {
 		return nil, err
 	}
@@ -459,4 +606,206 @@ func (s *ReportService) GetTopRecipeVariance(
 	return &dto.TopRecipeVarianceResponse{
 		Items: items,
 	}, nil
+}
+
+func (s *ReportService) TotalDailyPlans(filters dto.ReportFiltersDTO) (int, error) {
+	return s.Repo.TotalDailyPlans(filters)
+}
+
+func (s *ReportService) FinalizedDailyPlans(filters dto.ReportFiltersDTO) (int, error) {
+	return s.Repo.FinalizedDailyPlans(filters)
+}
+
+func (s *ReportService) DraftDailyPlans(filters dto.ReportFiltersDTO) (int, error) {
+	return s.Repo.DraftDailyPlans(filters)
+}
+
+func (s *ReportService) DailyPlanTrends(filters dto.ReportFiltersDTO) ([]dto.DailyPlanTrendPointDTO, error) {
+	if filters.GroupBy == "" {
+		filters.GroupBy = "day"
+	}
+
+	return s.Repo.DailyPlanTrends(filters)
+}
+
+func (s *ReportService) RecentDailyPlans(filters dto.ReportFiltersDTO) ([]dto.RecentDailyPlanItemDTO, error) {
+	return s.Repo.RecentDailyPlans(filters)
+}
+
+func (s *ReportService) DailyPlanRequisitionPDF(
+	ctx context.Context,
+	dailyPlanID int64,
+) ([]byte, error) {
+
+	data, err := s.Repo.DailyPlanRequisitionExport(ctx, dailyPlanID)
+	if err != nil {
+		return nil, err
+	}
+
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.SetMargins(12, 12, 12)
+	pdf.AddPage()
+
+	logoPath := "assets/newco-logo.png"
+
+	// Logo
+	pdf.ImageOptions(
+		logoPath,
+		12,
+		10,
+		45,
+		0,
+		false,
+		gofpdf.ImageOptions{
+			ImageType: "PNG",
+			ReadDpi:   true,
+		},
+		0,
+		"",
+	)
+
+	// Title
+	pdf.SetY(22)
+	pdf.SetFont("Arial", "B", 16)
+	pdf.CellFormat(
+		0,
+		10,
+		"Daily Plan Requisition Form",
+		"",
+		1,
+		"C",
+		false,
+		0,
+		"",
+	)
+
+	// Divider line
+	pdf.SetDrawColor(200, 200, 200)
+	pdf.Line(12, 32, 198, 32)
+
+	pdf.Ln(6)
+
+	pdf.SetFont("Arial", "", 11)
+
+	pdf.Cell(50, 8, "Daily Plan ID:")
+	pdf.Cell(0, 8, strconv.FormatInt(data.DailyPlanID, 10))
+	pdf.Ln(7)
+
+	pdf.Cell(50, 8, "Site:")
+	pdf.Cell(0, 8, data.BranchName)
+	pdf.Ln(7)
+
+	pdf.Cell(50, 8, "Used Date:")
+	pdf.Cell(0, 8, data.UsedDate)
+	pdf.Ln(7)
+
+	pdf.Cell(50, 8, "Created By:")
+	pdf.Cell(0, 8, data.CreatedBy)
+	pdf.Ln(10)
+
+	pdf.SetFont("Arial", "B", 11)
+
+	const (
+		colIngredient = 92.0
+		colGroup      = 38.0
+		colQuantity   = 30.0
+		colUnit       = 20.0
+	)
+
+	writeTableHeader := func() {
+		pdf.SetFont("Arial", "B", 11)
+
+		pdf.CellFormat(colIngredient, 8, "Ingredient", "1", 0, "", false, 0, "")
+		pdf.CellFormat(colGroup, 8, "Group", "1", 0, "", false, 0, "")
+		pdf.CellFormat(colQuantity, 8, "Quantity", "1", 0, "R", false, 0, "")
+		pdf.CellFormat(colUnit, 8, "Unit", "1", 1, "C", false, 0, "")
+
+		pdf.SetFont("Arial", "", 10)
+	}
+
+	writeTableHeader()
+
+	for _, item := range data.Items {
+
+		if pdf.GetY() > 275 {
+			pdf.AddPage()
+			pdf.SetY(15)
+			writeTableHeader()
+		}
+
+		displayUnit := exportDisplayUnit(item.Unit)
+		displayValue := exportDisplayValue(item.Unit, item.Quantity)
+
+		x := pdf.GetX()
+		y := pdf.GetY()
+
+		lineHeight := 7.0
+
+		ingredientLines := pdf.SplitLines(
+			[]byte(item.Ingredient),
+			colIngredient-2,
+		)
+
+		rowHeight := float64(len(ingredientLines)) * lineHeight
+
+		if rowHeight < 7 {
+			rowHeight = 7
+		}
+
+		pdf.Rect(x, y, colIngredient, rowHeight, "")
+		pdf.MultiCell(
+			colIngredient,
+			lineHeight,
+			item.Ingredient,
+			"",
+			"",
+			false,
+		)
+
+		pdf.SetXY(x+colIngredient, y)
+		pdf.CellFormat(
+			colGroup,
+			rowHeight,
+			item.Group,
+			"1",
+			0,
+			"",
+			false,
+			0,
+			"",
+		)
+
+		pdf.CellFormat(
+			colQuantity,
+			rowHeight,
+			exportFloat3(displayValue),
+			"1",
+			0,
+			"R",
+			false,
+			0,
+			"",
+		)
+
+		pdf.CellFormat(
+			colUnit,
+			rowHeight,
+			displayUnit,
+			"1",
+			1,
+			"C",
+			false,
+			0,
+			"",
+		)
+	}
+
+	var buffer bytes.Buffer
+
+	err = pdf.Output(&buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }

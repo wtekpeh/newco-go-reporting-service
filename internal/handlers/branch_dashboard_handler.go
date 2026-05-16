@@ -107,3 +107,24 @@ func (h *BranchDashboardHandler) RecentBatches(c *fiber.Ctx) error {
 		"items": items,
 	})
 }
+
+func (h *BranchDashboardHandler) DailyPlanTrends(c *fiber.Ctx) error {
+	value := c.Locals(middleware.AccessContextKey)
+	access, ok := value.(*dto.AccessContext)
+	if !ok || access == nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"detail": "access context missing",
+		})
+	}
+
+	items, err := h.service.GetDailyPlanTrends(c.UserContext(), access)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"detail": "failed to load daily plan trends",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"series": items,
+	})
+}

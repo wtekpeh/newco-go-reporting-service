@@ -236,7 +236,7 @@ const IngredientCategoryDailyQuery = `
 	LEFT JOIN recipes_ingredientcategory ic
 		ON ic.id = ri.category_id
 
-	WHERE cb.used_date = $1
+	WHERE cb.used_date BETWEEN $1 AND $2
 
 	GROUP BY
 		cb.used_date::date,
@@ -342,4 +342,108 @@ const TopRecipeVarianceQuery = `
 	         r.name ASC
 
 	LIMIT 10
+`
+
+const TotalDailyPlansQuery = `
+	SELECT COUNT(*)
+	FROM cooking_dailyconsumptionplan
+	WHERE ($1 = '' OR branch_id::text = $1)
+`
+
+const FinalizedDailyPlansQuery = `
+	SELECT COUNT(*)
+	FROM cooking_dailyconsumptionplan
+	WHERE status = 'final'
+	AND ($1 = '' OR branch_id::text = $1)
+`
+
+const DraftDailyPlansQuery = `
+	SELECT COUNT(*)
+	FROM cooking_dailyconsumptionplan
+	WHERE status = 'draft'
+	AND ($1 = '' OR branch_id::text = $1)
+`
+
+const DailyPlanTrendsQuery = `
+	WITH grouped_daily_plans AS (
+		SELECT
+			CASE
+				WHEN $4 = 'week' THEN DATE_TRUNC('week', created_at)
+				WHEN $4 = 'month' THEN DATE_TRUNC('month', created_at)
+				ELSE DATE_TRUNC('day', created_at)
+			END AS grouped_date
+
+		FROM cooking_dailyconsumptionplan
+
+		WHERE ($1 = '' OR DATE(created_at) >= $1::date)
+		  AND ($2 = '' OR DATE(created_at) <= $2::date)
+		  AND ($3 = '' OR branch_id::text = $3)
+	)
+
+	SELECT
+		TO_CHAR(grouped_date, 'YYYY-MM-DD') AS label,
+		COUNT(*) AS count
+
+	FROM grouped_daily_plans
+
+	GROUP BY grouped_date
+	ORDER BY grouped_date ASC
+`
+
+const RecentDailyPlansQuery = `
+	SELECT
+		dp.id,
+		b.name AS branch_name,
+		COALESCE(sp.full_name, sp.email, sp.username, sp.keycloak_sub) AS created_by,
+		dp.used_date,
+		dp.status,
+		dp.created_at
+	FROM cooking_dailyconsumptionplan dp
+	LEFT JOIN accounts_branch b ON b.id = dp.branch_id
+	LEFT JOIN accounts_staffprofile sp ON sp.id = dp.created_by_id
+	WHERE ($1 = '' OR DATE(dp.created_at) >= $1::date)
+	  AND ($2 = '' OR DATE(dp.created_at) <= $2::date)
+	  AND ($3 = '' OR dp.branch_id::text = $3)
+	ORDER BY dp.created_at DESC
+	LIMIT 10
+`
+
+const DailyPlanRequisitionPDFQuery = `
+	SELECT
+		dp.id,
+		dp.used_date,
+		dp.status,
+
+		b.name AS branch_name,
+
+		COALESCE(
+			sp.full_name,
+			sp.email,
+			sp.username,
+			sp.keycloak_sub
+		) AS created_by,
+
+		s.ingredient,
+		s.group,
+
+		s.adjusted_total_g,
+		s.adjusted_total_kg,
+
+		s.unit_display
+
+	FROM cooking_dailyconsumptionplan dp
+
+	INNER JOIN accounts_branch b
+		ON b.id = dp.branch_id
+
+	LEFT JOIN accounts_staffprofile sp
+		ON sp.id = dp.created_by_id
+
+	INNER JOIN cooking_dailyconsumptionplaningredientsummary s
+		ON s.plan_id = dp.id
+
+	WHERE dp.id = $1
+	  AND dp.status = 'final'
+
+	ORDER BY s.ingredient ASC
 `

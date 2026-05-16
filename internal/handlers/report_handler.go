@@ -109,15 +109,42 @@ func (h *ReportHandler) ExecutiveSummary(c *fiber.Ctx) error {
 		})
 	}
 
+	totalDailyPlans, err := h.Service.TotalDailyPlans(filters)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to fetch total daily plans",
+			Error:   err.Error(),
+		})
+	}
+
+	finalizedDailyPlans, err := h.Service.FinalizedDailyPlans(filters)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to fetch finalized daily plans",
+			Error:   err.Error(),
+		})
+	}
+
+	draftDailyPlans, err := h.Service.DraftDailyPlans(filters)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to fetch draft daily plans",
+			Error:   err.Error(),
+		})
+	}
+
 	response := dto.ExecutiveSummaryResponse{
 		Message: "executive summary endpoint ready",
 		Kpis: dto.ExecutiveKpisDTO{
-			TotalUsers:       totalUsers,
-			TotalActiveUsers: totalActiveUsers,
-			TotalBranches:    totalBranches,
-			TotalBatches:     totalBatches,
-			BatchesThisWeek:  batchesThisWeek,
-			BatchesThisMonth: batchesThisMonth,
+			TotalUsers:          totalUsers,
+			TotalActiveUsers:    totalActiveUsers,
+			TotalBranches:       totalBranches,
+			TotalBatches:        totalBatches,
+			BatchesThisWeek:     batchesThisWeek,
+			BatchesThisMonth:    batchesThisMonth,
+			TotalDailyPlans:     totalDailyPlans,
+			FinalizedDailyPlans: finalizedDailyPlans,
+			DraftDailyPlans:     draftDailyPlans,
 		},
 		Highlights: dto.ExecutiveHighlightsDTO{
 			MostActiveBranch:        mostActiveBranch,
@@ -292,23 +319,36 @@ func (h *ReportHandler) Branches(c *fiber.Ctx) error {
 
 func (h *ReportHandler) IngredientCategoryDaily(c *fiber.Ctx) error {
 
-	dateStr := c.Query("date")
-	if dateStr == "" {
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	if startDateStr == "" || endDateStr == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
-			Message: "date query parameter is required",
-			Error:   "use format YYYY-MM-DD",
+			Message: "start_date and end_date are required",
 		})
 	}
 
-	date, err := time.Parse("2006-01-02", dateStr)
+	startDate, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
-			Message: "invalid date format",
-			Error:   "use format YYYY-MM-DD",
+			Message: "invalid start_date format",
+			Error:   err.Error(),
 		})
 	}
 
-	items, err := h.Service.GetIngredientCategoryDaily(c.Context(), date)
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid end_date format",
+			Error:   err.Error(),
+		})
+	}
+
+	items, err := h.Service.GetIngredientCategoryDaily(
+		c.UserContext(),
+		startDate,
+		endDate,
+	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
 			Message: "failed to fetch ingredient category daily report",
@@ -323,23 +363,37 @@ func (h *ReportHandler) IngredientCategoryDaily(c *fiber.Ctx) error {
 }
 
 func (h *ReportHandler) ExportIngredientCategoryDailyExcel(c *fiber.Ctx) error {
-	dateStr := c.Query("date")
-	if dateStr == "" {
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	if startDateStr == "" || endDateStr == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
-			Message: "date query parameter is required",
+			Message: "start_date and end_date query parameters are required",
 			Error:   "use format YYYY-MM-DD",
 		})
 	}
 
-	date, err := time.Parse("2006-01-02", dateStr)
+	startDate, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
-			Message: "invalid date format",
+			Message: "invalid start_date format",
 			Error:   "use format YYYY-MM-DD",
 		})
 	}
 
-	fileBytes, err := h.Service.ExportIngredientCategoryDailyExcel(c.Context(), date)
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid end_date format",
+			Error:   "use format YYYY-MM-DD",
+		})
+	}
+
+	fileBytes, err := h.Service.ExportIngredientCategoryDailyExcel(
+		c.Context(),
+		startDate,
+		endDate,
+	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
 			Message: "failed to export ingredient category daily excel",
@@ -347,9 +401,61 @@ func (h *ReportHandler) ExportIngredientCategoryDailyExcel(c *fiber.Ctx) error {
 		})
 	}
 
-	filename := "ingredient_category_daily_" + dateStr + ".xlsx"
+	filename := "ingredient_category_daily_" + startDateStr + "_to_" + endDateStr + ".xlsx"
 
 	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Set("Content-Disposition", "attachment; filename="+filename)
+
+	return c.Send(fileBytes)
+}
+
+func (h *ReportHandler) ExportIngredientCategoryDailyPDF(c *fiber.Ctx) error {
+
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	if startDateStr == "" || endDateStr == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "start_date and end_date query parameters are required",
+			Error:   "use format YYYY-MM-DD",
+		})
+	}
+
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid start_date format",
+			Error:   "use format YYYY-MM-DD",
+		})
+	}
+
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid end_date format",
+			Error:   "use format YYYY-MM-DD",
+		})
+	}
+
+	fileBytes, err := h.Service.ExportIngredientCategoryDailyPDF(
+		c.Context(),
+		startDate,
+		endDate,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to export ingredient category daily pdf",
+			Error:   err.Error(),
+		})
+	}
+
+	filename := "ingredient_category_daily_" +
+		startDateStr +
+		"_to_" +
+		endDateStr +
+		".pdf"
+
+	c.Set("Content-Type", "application/pdf")
 	c.Set("Content-Disposition", "attachment; filename="+filename)
 
 	return c.Send(fileBytes)
@@ -423,4 +529,72 @@ func (h *ReportHandler) GetTopRecipeVariance(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(result)
+}
+
+func (h *ReportHandler) DailyPlanTrends(c *fiber.Ctx) error {
+	filters := h.parseFilters(c)
+
+	series, err := h.Service.DailyPlanTrends(filters)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to fetch daily plan trends",
+			Error:   err.Error(),
+		})
+	}
+
+	response := dto.DailyPlanTrendsResponse{
+		Message: "daily plan trends fetched successfully",
+		Series:  series,
+	}
+
+	return c.JSON(response)
+}
+
+func (h *ReportHandler) RecentDailyPlans(c *fiber.Ctx) error {
+	filters := h.parseFilters(c)
+
+	items, err := h.Service.RecentDailyPlans(filters)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to fetch recent daily plans",
+			Error:   err.Error(),
+		})
+	}
+
+	response := dto.RecentDailyPlansResponse{
+		Message: "recent daily plans fetched successfully",
+		Items:   items,
+	}
+
+	return c.JSON(response)
+}
+
+func (h *ReportHandler) DailyPlanRequisitionPDF(c *fiber.Ctx) error {
+
+	dailyPlanID, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Message: "invalid daily plan id",
+			Error:   err.Error(),
+		})
+	}
+
+	pdfBytes, err := h.Service.DailyPlanRequisitionPDF(
+		c.UserContext(),
+		dailyPlanID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Message: "failed to export requisition pdf",
+			Error:   err.Error(),
+		})
+	}
+
+	c.Set("Content-Type", "application/pdf")
+	c.Set(
+		"Content-Disposition",
+		`attachment; filename="daily_plan_requisition.pdf"`,
+	)
+
+	return c.Send(pdfBytes)
 }
