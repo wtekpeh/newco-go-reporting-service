@@ -14,6 +14,9 @@ type Config struct {
 	KeycloakServerURL string
 	KeycloakRealm     string
 	KeycloakClientID  string
+
+	OllamaBaseURL string
+	OllamaModel   string
 }
 
 func getEnv(key, fallback string) string {
@@ -37,5 +40,8 @@ func Load() *Config {
 		KeycloakServerURL: getEnv("KEYCLOAK_SERVER_URL", ""),
 		KeycloakRealm:     getEnv("KEYCLOAK_REALM", ""),
 		KeycloakClientID:  getEnv("KEYCLOAK_CLIENT_ID", ""),
+
+		OllamaBaseURL: getEnv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+		OllamaModel:   getEnv("OLLAMA_MODEL", "qwen3:4b"),
 	}
 }

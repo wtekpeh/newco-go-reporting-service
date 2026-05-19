@@ -17,6 +17,9 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	aihandlers "newco-go-reporting-service/internal/ai/handlers"
+	aiservices "newco-go-reporting-service/internal/ai/services"
 )
 
 func Register(
@@ -50,6 +53,15 @@ func Register(
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	ollamaService := aiservices.NewOllamaService(
+		cfg.OllamaBaseURL,
+		cfg.OllamaModel,
+	)
+
+	executiveAIHandler := aihandlers.NewExecutiveAIHandler(
+		ollamaService,
+	)
 
 	app.Get("/", healthHandler.Check)
 	app.Get("/health", healthHandler.Check)
@@ -106,6 +118,13 @@ func Register(
 	notifications.Get("/unread-count", notificationHandler.GetMyUnreadCount)
 	notifications.Patch("/:id/read", notificationHandler.MarkMyNotificationAsRead)
 	notifications.Patch("/read-all", notificationHandler.MarkAllMyNotificationsAsRead)
+
+	ai := app.Group("/ai")
+
+	ai.Post(
+		"/executive-summary",
+		executiveAIHandler.GenerateSummary,
+	)
 
 	app.Use(
 		"/ws/notifications",
