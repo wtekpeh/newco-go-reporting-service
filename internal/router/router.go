@@ -59,8 +59,13 @@ func Register(
 		cfg.OllamaModel,
 	)
 
+	executiveContextBuilder := aiservices.NewExecutiveContextBuilder(
+		reportService,
+	)
+
 	executiveAIHandler := aihandlers.NewExecutiveAIHandler(
 		ollamaService,
+		executiveContextBuilder,
 	)
 
 	app.Get("/", healthHandler.Check)
@@ -119,7 +124,11 @@ func Register(
 	notifications.Patch("/:id/read", notificationHandler.MarkMyNotificationAsRead)
 	notifications.Patch("/read-all", notificationHandler.MarkAllMyNotificationsAsRead)
 
-	ai := app.Group("/ai")
+	ai := app.Group(
+		"/ai",
+		authMiddleware.RequireAuth(),
+		authMiddleware.RequireExecutive(),
+	)
 
 	ai.Post(
 		"/executive-summary",

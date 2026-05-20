@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"newco-go-reporting-service/internal/ai/dto"
 	"newco-go-reporting-service/internal/ai/services"
 
@@ -8,14 +9,18 @@ import (
 )
 
 type ExecutiveAIHandler struct {
-	Ollama *services.OllamaService
+	Ollama         *services.OllamaService
+	ContextBuilder *services.ExecutiveContextBuilder
 }
 
 func NewExecutiveAIHandler(
 	ollama *services.OllamaService,
+	contextBuilder *services.ExecutiveContextBuilder,
 ) *ExecutiveAIHandler {
+
 	return &ExecutiveAIHandler{
-		Ollama: ollama,
+		Ollama:         ollama,
+		ContextBuilder: contextBuilder,
 	}
 }
 
@@ -37,15 +42,37 @@ Do not include chain-of-thought.
 Respond in concise executive language.
 `
 
+	executiveContext, err := h.ContextBuilder.BuildExecutiveSummaryContext(
+		c.UserContext(),
+		request,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "failed to build executive AI context",
+			"error":   err.Error(),
+		})
+	}
+
 	userPrompt := `
-Generate a short executive summary for NewCo operations.
+Generate a STRICT JSON response only.
 
-Current request:
-Start date: ` + request.StartDate + `
-End date: ` + request.EndDate + `
+Do not include markdown.
+Do not include explanations.
+Do not include code fences.
+Do not include introductory text.
 
-For now, this is a connectivity test. Summarize that the AI service is connected and ready.
-`
+Required JSON schema:
+
+{
+  "summary": "string",
+  "key_insights": ["string"],
+  "risks": ["string"],
+  "recommendations": ["string"]
+}
+
+Approved operational facts:
+
+` + executiveContext
 
 	content, err := h.Ollama.Chat(
 		c.UserContext(),
@@ -59,19 +86,33 @@ For now, this is a connectivity test. Summarize that the AI service is connected
 		})
 	}
 
+	type AIExecutiveStructuredResponse struct {
+		Summary         string   `json:"summary"`
+		KeyInsights     []string `json:"key_insights"`
+		Risks           []string `json:"risks"`
+		Recommendations []string `json:"recommendations"`
+	}
+
+	var aiResult AIExecutiveStructuredResponse
+
+	err = json.Unmarshal([]byte(content), &aiResult)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message":         "failed to parse AI response",
+			"error":           err.Error(),
+			"raw_ai_response": content,
+		})
+	}
+
 	response := dto.ExecutiveSummaryResponse{
-		Message: "AI executive summary generated successfully",
-		Summary: content,
-		KeyInsights: []string{
-			"AI service connection is working.",
-		},
-		Risks: []string{},
-		Recommendations: []string{
-			"Next step is to connect approved reporting facts from Go.",
-		},
+		Message:         "AI executive summary generated successfully",
+		Summary:         aiResult.Summary,
+		KeyInsights:     aiResult.KeyInsights,
+		Risks:           aiResult.Risks,
+		Recommendations: aiResult.Recommendations,
 		DataNotes: []string{
-			"This response is a connectivity test only.",
-			"The LLM did not access the database directly.",
+			"Response generated from approved operational facts only.",
+			"LLM did not directly access the database.",
 		},
 	}
 
