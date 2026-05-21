@@ -61,16 +61,42 @@ Do not include explanations.
 Do not include code fences.
 Do not include introductory text.
 
-Required JSON schema:
+Required response format:
+
+Return ONLY valid JSON.
+
+Do NOT return:
+- markdown
+- bullet points
+- explanations
+- headings
+- labels like "Summary:"
+- code fences
+
+The response MUST start with {
+and MUST end with }
+
+Example valid response:
 
 {
-  "summary": "string",
-  "key_insights": ["string"],
-  "risks": ["string"],
-  "recommendations": ["string"]
+  "summary": "Operations remained stable.",
+  "key_insights": [
+    "Accra Site processed the highest batches."
+  ],
+  "risks": [
+    "One draft daily plan remains pending."
+  ],
+  "recommendations": [
+    "Finalize pending draft daily plans."
+  ]
 }
 
 Approved operational facts:
+
+Interpretation rules:
+- If total_actual is 0, assume actual usage has not yet been recorded unless explicitly stated otherwise.
+- Do not automatically treat missing actual usage as a discrepancy or operational failure.
+- Focus only on confirmed operational risks.
 
 ` + executiveContext
 
