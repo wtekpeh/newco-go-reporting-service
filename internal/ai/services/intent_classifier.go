@@ -39,6 +39,7 @@ func (c *IntentClassifier) Classify(
 
 		if lowerMessage == "why" ||
 			lowerMessage == "why?" ||
+			strings.Contains(lowerMessage, "why is that so") ||
 			lowerMessage == "explain" ||
 			lowerMessage == "explain why" ||
 			strings.Contains(lowerMessage, "what should management do") ||
