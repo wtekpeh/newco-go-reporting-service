@@ -63,6 +63,21 @@ func Register(
 		reportService,
 	)
 
+	chatMemoryStore := aiservices.NewChatMemoryStore()
+
+	intentClassifier := aiservices.NewIntentClassifier(
+		ollamaService,
+		chatMemoryStore,
+	)
+
+	aiChatHandler := aihandlers.NewAIChatHandler(
+		intentClassifier,
+		ollamaService,
+		reportService,
+		chatMemoryStore,
+		executiveContextBuilder,
+	)
+
 	executiveAIHandler := aihandlers.NewExecutiveAIHandler(
 		ollamaService,
 		executiveContextBuilder,
@@ -133,6 +148,11 @@ func Register(
 	ai.Post(
 		"/executive-summary",
 		executiveAIHandler.GenerateSummary,
+	)
+
+	ai.Post(
+		"/chat",
+		aiChatHandler.Chat,
 	)
 
 	app.Use(

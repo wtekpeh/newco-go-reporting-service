@@ -1,9 +1,11 @@
 package dto
 
 type OllamaChatRequest struct {
-	Model    string          `json:"model"`
-	Messages []OllamaMessage `json:"messages"`
-	Stream   bool            `json:"stream"`
+	Model    string                 `json:"model"`
+	Messages []OllamaMessage        `json:"messages"`
+	Stream   bool                   `json:"stream"`
+	Think    *bool                  `json:"think,omitempty"`
+	Options  map[string]interface{} `json:"options,omitempty"`
 }
 
 type OllamaMessage struct {

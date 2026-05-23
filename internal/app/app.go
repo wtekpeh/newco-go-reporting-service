@@ -24,9 +24,11 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *fiber.App {
 	app.Use(recover.New())
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "https://vite.williamtekpeh.com,http://localhost:5173,http://127.0.0.1:5173",
-		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowOrigins:     "https://vite.williamtekpeh.com,http://localhost:5173,http://127.0.0.1:5173",
+		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
+		ExposeHeaders:    "Content-Length,Content-Type",
+		AllowCredentials: true,
 	}))
 
 	hub := notificationsrealtime.NewHub()

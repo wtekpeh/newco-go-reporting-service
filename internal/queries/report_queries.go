@@ -131,6 +131,31 @@ const BranchSummaryQuery = `
 	GROUP BY b.id, b.name
 	ORDER BY total_batches DESC, b.name ASC
 `
+
+const AIBranchPerformanceQuery = `
+	SELECT
+		b.id AS branch_id,
+		b.name AS branch_name,
+
+		COUNT(DISTINCT cb.id) AS distinct_batches,
+
+		COUNT(DISTINCT cb.created_by_id) AS staff_count
+
+	FROM accounts_branch b
+
+	LEFT JOIN cooking_cookbatch cb
+		ON cb.branch_id = b.id
+		AND cb.status = 'final'
+		AND ($1 = '' OR cb.used_date >= $1::date)
+		AND ($2 = '' OR cb.used_date <= $2::date)
+
+	GROUP BY b.id, b.name
+
+	ORDER BY distinct_batches DESC,
+	         staff_count DESC,
+	         b.name ASC
+`
+
 const RoleDistributionQuery = `
 	SELECT role, COUNT(*) AS count
 	FROM accounts_branchroleassignment
@@ -335,7 +360,15 @@ const TopRecipeVarianceQuery = `
 
 	GROUP BY r.id, r.name
 
-	HAVING COUNT(DISTINCT cb.id) > 0
+	HAVING ROUND(
+		AVG(
+			ABS(
+				COALESCE(cbi.actual_g, 0) -
+				COALESCE(cbi.final_g, 0)
+			)
+		)::numeric,
+		3
+	) > 0
 
 	ORDER BY average_variance_g DESC,
 	         total_batches DESC,
@@ -446,4 +479,20 @@ const DailyPlanRequisitionPDFQuery = `
 	  AND dp.status = 'final'
 
 	ORDER BY s.ingredient ASC
+`
+
+const DailyPlanSummaryQuery = `
+	SELECT
+		status,
+		COUNT(*) AS count
+
+	FROM cooking_dailyconsumptionplan
+
+	WHERE ($1 = '' OR used_date >= $1::date)
+		AND ($2 = '' OR used_date <= $2::date)
+
+	GROUP BY status
+
+	ORDER BY count DESC,
+	         status ASC
 `

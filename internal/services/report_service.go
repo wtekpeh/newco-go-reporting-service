@@ -809,3 +809,17 @@ func (s *ReportService) DailyPlanRequisitionPDF(
 
 	return buffer.Bytes(), nil
 }
+
+func (s *ReportService) AIBranchPerformance(
+	filters dto.ReportFiltersDTO,
+) ([]dto.BranchSummaryItemDTO, error) {
+
+	return s.Repo.AIBranchPerformance(filters)
+}
+
+func (s *ReportService) DailyPlanSummary(
+	filters dto.ReportFiltersDTO,
+) ([]map[string]interface{}, error) {
+
+	return s.Repo.DailyPlanSummary(filters)
+}

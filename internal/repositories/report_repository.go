@@ -807,3 +807,81 @@ func (r *ReportRepository) DailyPlanRequisitionExport(
 
 	return &result, nil
 }
+
+func (r *ReportRepository) AIBranchPerformance(
+	filters dto.ReportFiltersDTO,
+) ([]dto.BranchSummaryItemDTO, error) {
+
+	rows, err := r.DB.Query(
+		context.Background(),
+		queries.AIBranchPerformanceQuery,
+		filters.StartDate,
+		filters.EndDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	items := []dto.BranchSummaryItemDTO{}
+
+	for rows.Next() {
+
+		var item dto.BranchSummaryItemDTO
+
+		err := rows.Scan(
+			&item.BranchID,
+			&item.BranchName,
+			&item.TotalBatches,
+			&item.StaffCount,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+func (r *ReportRepository) DailyPlanSummary(
+	filters dto.ReportFiltersDTO,
+) ([]map[string]interface{}, error) {
+
+	rows, err := r.DB.Query(
+		context.Background(),
+		queries.DailyPlanSummaryQuery,
+		filters.StartDate,
+		filters.EndDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	results := []map[string]interface{}{}
+
+	for rows.Next() {
+
+		var status string
+		var count int64
+
+		err := rows.Scan(
+			&status,
+			&count,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, map[string]interface{}{
+			"status": status,
+			"count":  count,
+		})
+	}
+
+	return results, nil
+}

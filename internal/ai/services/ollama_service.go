@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"newco-go-reporting-service/internal/ai/dto"
 )
@@ -35,9 +36,17 @@ func (s *OllamaService) Chat(
 	userPrompt string,
 ) (string, error) {
 
+	userPrompt = "/no_think\nReturn only the final answer. Do not show reasoning, analysis, planning, or thinking.\n\n" + userPrompt
+	think := false
+
 	requestBody := dto.OllamaChatRequest{
 		Model:  s.Model,
 		Stream: false,
+		Think:  &think,
+		Options: map[string]interface{}{
+			"num_predict": 80,
+			"temperature": 0.1,
+		},
 		Messages: []dto.OllamaMessage{
 			{
 				Role:    "system",
@@ -93,5 +102,37 @@ func (s *OllamaService) Chat(
 		return "", err
 	}
 
-	return ollamaResponse.Message.Content, nil
+	return cleanAssistantContent(ollamaResponse.Message.Content), nil
+}
+
+func cleanAssistantContent(content string) string {
+	markers := []string{
+		"Final answer:",
+		"Final Answer:",
+		"Answer:",
+		"ANSWER:",
+	}
+
+	for _, marker := range markers {
+		if strings.Contains(content, marker) {
+			parts := strings.Split(content, marker)
+			return strings.TrimSpace(parts[len(parts)-1])
+		}
+	}
+
+	reasoningStarters := []string{
+		"Okay,",
+		"Let's",
+		"First,",
+		"I need to",
+		"Looking at",
+	}
+
+	for _, starter := range reasoningStarters {
+		if strings.HasPrefix(strings.TrimSpace(content), starter) {
+			return ""
+		}
+	}
+
+	return strings.TrimSpace(content)
 }
