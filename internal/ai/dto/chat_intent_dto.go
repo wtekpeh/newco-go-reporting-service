@@ -10,4 +10,8 @@ type AIIntentClassification struct {
 	ChartType string `json:"chart_type,omitempty"`
 
 	Reason string `json:"reason"`
+
+	ConfidenceScore float64 `json:"confidence_score"`
+
+	ClassificationSource string `json:"classification_source"`
 }

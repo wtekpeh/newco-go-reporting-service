@@ -885,3 +885,72 @@ func (r *ReportRepository) DailyPlanSummary(
 
 	return results, nil
 }
+
+func (r *ReportRepository) GetAIPlanningRiskSummary(
+	filters dto.ReportFiltersDTO,
+) (dto.AIPlanningRiskSummaryDTO, error) {
+
+	var summary dto.AIPlanningRiskSummaryDTO
+
+	err := r.DB.QueryRow(
+		context.Background(),
+		queries.AIPlanningRiskSummaryQuery,
+		filters.StartDate,
+		filters.EndDate,
+	).Scan(
+		&summary.TotalPlans,
+		&summary.DraftPlans,
+		&summary.FinalizedPlans,
+		&summary.PlansMissingActuals,
+	)
+	if err != nil {
+		return summary, err
+	}
+
+	// Risk evaluation
+	if summary.DraftPlans > 0 {
+		summary.RiskLevel = "medium"
+
+		summary.RiskReasons = append(
+			summary.RiskReasons,
+			"There are draft plans pending finalization.",
+		)
+
+		summary.ManagementAttention = append(
+			summary.ManagementAttention,
+			"Review and finalize pending operational plans.",
+		)
+	}
+
+	if summary.PlansMissingActuals > 0 {
+		summary.RiskLevel = "medium"
+
+		summary.RiskReasons = append(
+			summary.RiskReasons,
+			"Some finalized plans are missing actual execution values.",
+		)
+
+		summary.ManagementAttention = append(
+			summary.ManagementAttention,
+			"Monitor execution reporting completeness.",
+		)
+	}
+
+	if summary.DraftPlans == 0 &&
+		summary.PlansMissingActuals == 0 {
+
+		summary.RiskLevel = "low"
+
+		summary.RiskReasons = append(
+			summary.RiskReasons,
+			"Operational planning appears fully finalized.",
+		)
+
+		summary.ManagementAttention = append(
+			summary.ManagementAttention,
+			"Continue monitoring execution readiness.",
+		)
+	}
+
+	return summary, nil
+}

@@ -70,12 +70,15 @@ func Register(
 		chatMemoryStore,
 	)
 
+	promptBuilder := aiservices.NewPromptBuilder()
+
 	aiChatHandler := aihandlers.NewAIChatHandler(
 		intentClassifier,
 		ollamaService,
 		reportService,
 		chatMemoryStore,
 		executiveContextBuilder,
+		promptBuilder,
 	)
 
 	executiveAIHandler := aihandlers.NewExecutiveAIHandler(

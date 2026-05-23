@@ -245,3 +245,19 @@ type DailyPlanRequisitionExportDTO struct {
 
 	Items []DailyPlanRequisitionItemDTO `json:"items"`
 }
+
+type AIPlanningRiskSummaryDTO struct {
+	TotalPlans int `json:"total_plans"`
+
+	DraftPlans int `json:"draft_plans"`
+
+	FinalizedPlans int `json:"finalized_plans"`
+
+	PlansMissingActuals int `json:"plans_missing_actuals"`
+
+	RiskLevel string `json:"risk_level"`
+
+	RiskReasons []string `json:"risk_reasons"`
+
+	ManagementAttention []string `json:"management_attention"`
+}

@@ -21,6 +21,116 @@ type AIChatHandler struct {
 	ReportService    *reportservices.ReportService
 	MemoryStore      *services.ChatMemoryStore
 	ContextBuilder   *services.ExecutiveContextBuilder
+	PromptBuilder    *services.PromptBuilder
+}
+
+type AIStructuredResponse struct {
+	Title string `json:"title"`
+
+	Observation string `json:"observation,omitempty"`
+
+	OperationalMeaning string `json:"operational_meaning,omitempty"`
+
+	Recommendation string `json:"recommendation,omitempty"`
+
+	PlanningStatus string `json:"planning_status,omitempty"`
+
+	OperationalRisk string `json:"operational_risk,omitempty"`
+
+	ManagementAttention string `json:"management_attention,omitempty"`
+
+	OperationalExplanation string `json:"operational_explanation,omitempty"`
+
+	OperationalAdvice string `json:"operational_advice,omitempty"`
+
+	ExpectedImprovement string `json:"expected_improvement,omitempty"`
+
+	ManagementConsideration string `json:"management_consideration,omitempty"`
+
+	OperationalImpact string `json:"operational_impact,omitempty"`
+
+	NextAction string `json:"next_action,omitempty"`
+}
+
+func formatStructuredAIResponse(rawContent string) string {
+	cleanContent := strings.TrimSpace(rawContent)
+
+	startIndex := strings.Index(cleanContent, "{")
+	endIndex := strings.LastIndex(cleanContent, "}")
+
+	if startIndex >= 0 && endIndex > startIndex {
+		cleanContent = cleanContent[startIndex : endIndex+1]
+	}
+
+	if !strings.HasPrefix(cleanContent, "{") {
+		return strings.TrimSpace(rawContent)
+	}
+
+	var structured AIStructuredResponse
+
+	err := json.Unmarshal(
+		[]byte(cleanContent),
+		&structured,
+	)
+	if err != nil {
+		return cleanContent
+	}
+
+	parts := []string{}
+
+	if structured.Title != "" {
+		parts = append(parts, structured.Title)
+	}
+
+	if structured.Observation != "" {
+		parts = append(parts, "Observation: "+structured.Observation)
+	}
+
+	if structured.OperationalMeaning != "" {
+		parts = append(parts, "Operational Meaning: "+structured.OperationalMeaning)
+	}
+
+	if structured.OperationalExplanation != "" {
+		parts = append(parts, "Operational Explanation: "+structured.OperationalExplanation)
+	}
+
+	if structured.PlanningStatus != "" {
+		parts = append(parts, "Planning Status: "+structured.PlanningStatus)
+	}
+
+	if structured.OperationalRisk != "" {
+		parts = append(parts, "Operational Risk: "+structured.OperationalRisk)
+	}
+
+	if structured.ManagementAttention != "" {
+		parts = append(parts, "Management Attention: "+structured.ManagementAttention)
+	}
+
+	if structured.Recommendation != "" {
+		parts = append(parts, "Recommendation: "+structured.Recommendation)
+	}
+
+	if structured.OperationalImpact != "" {
+		parts = append(parts, "Operational Impact: "+structured.OperationalImpact)
+	}
+
+	if structured.NextAction != "" {
+		parts = append(parts, "Next Action: "+structured.NextAction)
+	}
+
+	if structured.OperationalAdvice != "" {
+		parts = append(parts, "Operational Advice: "+structured.OperationalAdvice)
+	}
+
+	if structured.ExpectedImprovement != "" {
+		parts = append(parts, "Expected Improvement: "+structured.ExpectedImprovement)
+	}
+
+	if structured.ManagementConsideration != "" {
+		parts = append(parts, "Management Consideration: "+structured.ManagementConsideration)
+	}
+
+	return strings.Join(parts, "\n\n")
 }
 
 func NewAIChatHandler(
@@ -29,6 +139,7 @@ func NewAIChatHandler(
 	reportService *reportservices.ReportService,
 	memoryStore *services.ChatMemoryStore,
 	contextBuilder *services.ExecutiveContextBuilder,
+	promptBuilder *services.PromptBuilder,
 ) *AIChatHandler {
 
 	return &AIChatHandler{
@@ -37,7 +148,73 @@ func NewAIChatHandler(
 		ReportService:    reportService,
 		MemoryStore:      memoryStore,
 		ContextBuilder:   contextBuilder,
+		PromptBuilder:    promptBuilder,
 	}
+}
+
+func determineConversationFocus(intent string, message string) string {
+	lowerMessage := strings.ToLower(message)
+
+	switch intent {
+	case "branch_performance":
+		if strings.Contains(lowerMessage, "overloaded") {
+			return "overloaded_site"
+		}
+
+		if strings.Contains(lowerMessage, "best") ||
+			strings.Contains(lowerMessage, "performing") {
+			return "best_performing_site"
+		}
+
+		if strings.Contains(lowerMessage, "inactive") {
+			return "inactive_sites"
+		}
+
+		if strings.Contains(lowerMessage, "staff") ||
+			strings.Contains(lowerMessage, "redistribute") {
+			return "staff_distribution"
+		}
+	}
+
+	return ""
+}
+
+func determineReasoningMode(message string) string {
+	lowerMessage := strings.ToLower(message)
+
+	if strings.Contains(lowerMessage, "why") ||
+		strings.Contains(lowerMessage, "explain") ||
+		strings.Contains(lowerMessage, "how so") ||
+		strings.Contains(lowerMessage, "that so") ||
+		strings.Contains(lowerMessage, "tell me more") ||
+		strings.Contains(lowerMessage, "more detail") {
+		return "explanation"
+	}
+
+	if strings.Contains(lowerMessage, "risk") ||
+		strings.Contains(lowerMessage, "danger") ||
+		strings.Contains(lowerMessage, "problem") ||
+		strings.Contains(lowerMessage, "issue") ||
+		strings.Contains(lowerMessage, "concern") {
+		return "risk_analysis"
+	}
+
+	if strings.Contains(lowerMessage, "recommend") ||
+		strings.Contains(lowerMessage, "advice") ||
+		strings.Contains(lowerMessage, "what should") ||
+		strings.Contains(lowerMessage, "what next") ||
+		strings.Contains(lowerMessage, "management do") ||
+		strings.Contains(lowerMessage, "do next") {
+		return "recommendation"
+	}
+
+	if strings.Contains(lowerMessage, "redistribute") ||
+		strings.Contains(lowerMessage, "staff") ||
+		strings.Contains(lowerMessage, "move staff") {
+		return "operational_advice"
+	}
+
+	return "detection"
 }
 
 func (h *AIChatHandler) Chat(c *fiber.Ctx) error {
@@ -94,6 +271,33 @@ func (h *AIChatHandler) Chat(c *fiber.Ctx) error {
 			"message": "unapproved AI tool selected",
 			"tool":    classification.ToolName,
 		})
+	}
+
+	if classification.ToolName == "planning_risk_summary" {
+		request.StartDate = ""
+		request.EndDate = ""
+	}
+
+	conversationFocus := determineConversationFocus(
+		classification.Intent,
+		request.Message,
+	)
+
+	if conversationFocus == "" && len(recentTurns) > 0 {
+		lastTurn := recentTurns[len(recentTurns)-1]
+		conversationFocus = lastTurn.Focus
+	}
+
+	conversationReasoningMode := determineReasoningMode(
+		request.Message,
+	)
+
+	if conversationReasoningMode == "detection" && len(recentTurns) > 0 {
+		lastTurn := recentTurns[len(recentTurns)-1]
+
+		if lastTurn.ReasoningMode != "" {
+			conversationReasoningMode = lastTurn.ReasoningMode
+		}
 	}
 
 	assistantResponse := "No tool execution implemented yet."
@@ -301,56 +505,6 @@ Approved operational facts:
 			})
 		}
 
-		jsonBytes, err := json.MarshalIndent(
-			branchSummary,
-			"",
-			"  ",
-		)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "failed to marshal branch summary",
-				"error":   err.Error(),
-			})
-		}
-
-		systemPrompt := `
-You are NewCo's site operations assistant.
-
-Do not show your reasoning.
-Do not explain your thinking process.
-Give only the final answer.
-
-Use ONLY approved operational facts.
-
-Use business terminology:
-- Say "consumption" instead of "batch".
-- Say "site" instead of "branch".
-
-Use correct grammar:
-- Say "1 consumption" for one.
-- Say "consumptions" for two or more.
-
-Do not invent numbers.
-Be concise and conversational.
-`
-
-		userPrompt := `
-User question:
-` + request.Message + `
-
-Interpretation rules:
-- Compare branches operationally.
-- Focus on workload, batch activity, staffing, and operational balance.
-- Highlight overloaded or dominant branches carefully.
-
-Approved operational facts:
-` + string(jsonBytes)
-
-		content, err := h.Ollama.Chat(
-			c.UserContext(),
-			systemPrompt,
-			userPrompt,
-		)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"message": "failed to generate branch AI response",
@@ -358,51 +512,78 @@ Approved operational facts:
 			})
 		}
 
-		assistantResponse = content
-
 		if assistantResponse == "" && len(branchSummary) > 0 {
 			topSite := branchSummary[0]
 
-			messageLower := strings.ToLower(request.Message)
-
-			if strings.Contains(messageLower, "why") {
-
-				assistantResponse = fmt.Sprintf(
-					"%s is performing best because it handled %d consumptions with %d staff, while the other sites recorded little or no operational activity during the selected period.",
-					topSite.BranchName,
-					topSite.TotalBatches,
-					topSite.StaffCount,
-				)
-
-			} else if strings.Contains(messageLower, "overloaded") {
-
-				assistantResponse = fmt.Sprintf(
-					"%s appears operationally overloaded because it is handling nearly all consumptions with only %d staff.",
-					topSite.BranchName,
-					topSite.StaffCount,
-				)
-
-			} else if strings.Contains(messageLower, "management") ||
-				strings.Contains(messageLower, "redistribute") ||
-				strings.Contains(messageLower, "recommend") ||
-				strings.Contains(messageLower, "advice") {
-
-				assistantResponse = fmt.Sprintf(
-					"Management should review staff distribution across sites. %s is currently handling most operational activity with only %d staff, while other sites remain underutilized.",
-					topSite.BranchName,
-					topSite.StaffCount,
-				)
-
-			} else {
-
-				assistantResponse = fmt.Sprintf(
-					"%s is performing best with %d consumptions and %d staff.",
-					topSite.BranchName,
-					topSite.TotalBatches,
-					topSite.StaffCount,
-				)
-			}
+			assistantResponse = fmt.Sprintf(
+				"%s appears operationally significant based on the current site activity data, with %d consumptions handled by %d staff during the selected period.",
+				topSite.BranchName,
+				topSite.TotalBatches,
+				topSite.StaffCount,
+			)
 		}
+
+		/*
+
+			if len(branchSummary) > 0 {
+				topSite := branchSummary[0]
+
+				if conversationFocus == "best_performing_site" {
+
+				} else if conversationFocus == "overloaded_site" {
+
+					if conversationReasoningMode == "recommendation" {
+						assistantResponse = fmt.Sprintf(
+							"Management should review workload distribution immediately. %s is carrying most of the consumption activity with only %d staff, so the next step should be to compare staff allocation across sites and consider temporary support or redistribution from underutilized sites.",
+							topSite.BranchName,
+							topSite.StaffCount,
+						)
+
+					} else if conversationReasoningMode == "risk_analysis" {
+						assistantResponse = fmt.Sprintf(
+							"The main risk is operational pressure on %s. With only %d staff handling most consumption activity, the site may face delays, staff fatigue, planning errors, or weaker control over ingredient usage if the workload continues like this.",
+							topSite.BranchName,
+							topSite.StaffCount,
+						)
+
+					} else if conversationReasoningMode == "explanation" {
+						assistantResponse = fmt.Sprintf(
+							"%s appears overloaded because it is handling nearly all consumptions with only %d staff while other sites remain underutilized.",
+							topSite.BranchName,
+							topSite.StaffCount,
+						)
+
+					} else {
+						assistantResponse = fmt.Sprintf(
+							"%s appears operationally overloaded because it is handling nearly all consumptions with only %d staff.",
+							topSite.BranchName,
+							topSite.StaffCount,
+						)
+					}
+
+				} else if conversationFocus == "staff_distribution" {
+
+					assistantResponse = fmt.Sprintf(
+						"Management should review staff distribution across sites. %s is currently handling most operational activity with only %d staff, while other sites remain underutilized.",
+						topSite.BranchName,
+						topSite.StaffCount,
+					)
+
+				} else if conversationFocus == "inactive_sites" {
+
+					assistantResponse = "Several sites appear operationally inactive with little or no recorded consumptions during the selected period."
+
+				} else {
+
+					assistantResponse = fmt.Sprintf(
+						"%s is performing best with %d consumptions and %d staff.",
+						topSite.BranchName,
+						topSite.TotalBatches,
+						topSite.StaffCount,
+					)
+				}
+			}
+		*/
 
 		chartData["branch_summary"] = branchSummary
 
@@ -412,6 +593,75 @@ Approved operational facts:
 			Dataset:   "branch_summary",
 			XField:    "branch_name",
 			YField:    "total_batches",
+		})
+	}
+
+	if classification.ToolName == "planning_risk_summary" {
+
+		filters := reportdto.ReportFiltersDTO{
+			StartDate: request.StartDate,
+			EndDate:   request.EndDate,
+		}
+
+		planningRiskSummary, err := h.ReportService.GetAIPlanningRiskSummary(
+			filters,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to fetch planning risk summary",
+				"error":   err.Error(),
+			})
+		}
+
+		jsonBytes, err := json.MarshalIndent(
+			planningRiskSummary,
+			"",
+			"  ",
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to marshal planning risk data",
+				"error":   err.Error(),
+			})
+		}
+
+		systemPrompt, userPrompt := h.PromptBuilder.BuildOperationalReasoningPrompt(
+			"risk_analysis",
+			request.Message,
+			string(jsonBytes),
+		)
+
+		content, err := h.Ollama.Chat(
+			c.UserContext(),
+			systemPrompt,
+			userPrompt,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to generate planning risk response",
+				"error":   err.Error(),
+			})
+		}
+
+		assistantResponse = formatStructuredAIResponse(content)
+
+		chartData["planning_risk_summary"] = planningRiskSummary
+
+		assistantResponse = fmt.Sprintf(
+			"Planning Risk Summary\n\nPlanning Status: %d total plans, with %d finalized and %d still in draft.\n\nOperational Risk: %s\n\nManagement Attention: %s",
+			planningRiskSummary.TotalPlans,
+			planningRiskSummary.FinalizedPlans,
+			planningRiskSummary.DraftPlans,
+			strings.Join(planningRiskSummary.RiskReasons, " "),
+			strings.Join(planningRiskSummary.ManagementAttention, " "),
+		)
+
+		chartSuggestions = append(chartSuggestions, dto.AIChartSuggestion{
+			ChartType: "line",
+			Title:     "Planning Risk Trends",
+			Dataset:   "planning_risk_summary",
+			XField:    "date",
+			YField:    "draft_count",
 		})
 	}
 
@@ -597,6 +847,10 @@ Approved operational facts:
 			Intent: classification.Intent,
 
 			ToolName: classification.ToolName,
+
+			Focus: conversationFocus,
+
+			ReasoningMode: conversationReasoningMode,
 
 			StartDate: request.StartDate,
 			EndDate:   request.EndDate,

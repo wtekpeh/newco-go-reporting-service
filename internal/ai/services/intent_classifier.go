@@ -8,10 +8,20 @@ import (
 	"newco-go-reporting-service/internal/ai/dto"
 )
 
+type IntentRule struct {
+	Intent     string
+	ToolName   string
+	ChartType  string
+	Keywords   []string
+	NeedsChart bool
+}
+
 type IntentClassifier struct {
 	Ollama      *OllamaService
 	MemoryStore *ChatMemoryStore
 }
+
+const minimumRuleConfidence = 0.10
 
 func NewIntentClassifier(
 	ollama *OllamaService,
@@ -22,6 +32,130 @@ func NewIntentClassifier(
 		Ollama:      ollama,
 		MemoryStore: memoryStore,
 	}
+}
+
+var intentRules = []IntentRule{
+	{
+		Intent:     "recipe_variance",
+		ToolName:   "top_recipe_variance",
+		ChartType:  "bar",
+		NeedsChart: true,
+		Keywords: []string{
+			"variance",
+			"prediction",
+			"deviation",
+			"actual vs",
+			"prediction error",
+			"inaccurate recipe",
+		},
+	},
+
+	{
+		Intent:     "ingredient_category_usage",
+		ToolName:   "ingredient_category_usage",
+		ChartType:  "bar",
+		NeedsChart: true,
+		Keywords: []string{
+			"ingredient",
+			"protein",
+			"carbohydrate",
+			"oil",
+			"category",
+			"consumption category",
+		},
+	},
+
+	{
+		Intent:     "branch_performance",
+		ToolName:   "branch_summary",
+		ChartType:  "bar",
+		NeedsChart: true,
+		Keywords: []string{
+			"site",
+			"branch",
+			"performing",
+			"performance",
+			"workload",
+			"overloaded",
+			"staff",
+			"redistribute",
+			"best site",
+			"inactive site",
+		},
+	},
+
+	{
+		Intent:     "daily_plan_summary",
+		ToolName:   "daily_plan_summary",
+		ChartType:  "pie",
+		NeedsChart: true,
+		Keywords: []string{
+			"daily plan",
+			"planning",
+			"draft",
+			"finalized",
+			"requisition",
+		},
+	},
+
+	{
+		Intent:     "planning_risk_summary",
+		ToolName:   "planning_risk_summary",
+		ChartType:  "line",
+		NeedsChart: true,
+		Keywords: []string{
+			"planning risk",
+			"planning issue",
+			"planning problem",
+			"planning delay",
+			"daily plan risk",
+			"requisition risk",
+			"planning readiness",
+			"which plans are risky",
+			"operational planning risk",
+			"planning concern",
+			"upcoming risk",
+			"upcoming plans",
+			"plans need attention",
+			"management attention",
+			"planning concerns",
+			"next few days",
+			"next week",
+			"this week",
+			"ready for execution",
+			"not ready",
+		},
+	},
+
+	{
+		Intent:     "executive_summary",
+		ToolName:   "executive_summary",
+		ChartType:  "line",
+		NeedsChart: true,
+		Keywords: []string{
+			"summary",
+			"summarize",
+			"overview",
+			"management",
+			"executive",
+			"business performance",
+			"operational summary",
+		},
+	},
+}
+
+func calculateRuleConfidence(score int, totalKeywords int) float64 {
+	if totalKeywords == 0 {
+		return 0
+	}
+
+	confidence := float64(score) / float64(totalKeywords)
+
+	if confidence > 1 {
+		return 1
+	}
+
+	return confidence
 }
 
 func (c *IntentClassifier) Classify(
@@ -37,98 +171,77 @@ func (c *IntentClassifier) Classify(
 	if len(recentTurns) > 0 {
 		lastTurn := recentTurns[len(recentTurns)-1]
 
-		if lowerMessage == "why" ||
-			lowerMessage == "why?" ||
-			strings.Contains(lowerMessage, "why is that so") ||
-			lowerMessage == "explain" ||
-			lowerMessage == "explain why" ||
-			strings.Contains(lowerMessage, "what should management do") ||
-			strings.Contains(lowerMessage, "redistribute staff") ||
-			strings.Contains(lowerMessage, "overloaded") ||
-			strings.Contains(lowerMessage, "recommend") ||
-			strings.Contains(lowerMessage, "advice") {
+		followUpKeywords := []string{
+			"why",
+			"explain",
+			"what do you mean",
+			"how so",
+			"what should",
+			"what can",
+			"what next",
+			"recommend",
+			"advice",
+			"action",
+			"management do",
+			"redistribute",
+			"clarify",
+			"that so",
+			"that's so",
+			"tell me more",
+			"more detail",
+		}
 
-			return &dto.AIIntentClassification{
-				Intent:     lastTurn.Intent,
-				ToolName:   lastTurn.ToolName,
-				NeedsChart: true,
-				ChartType:  "",
-				Reason:     "follow-up question inherited previous intent and tool",
-			}, nil
+		for _, keyword := range followUpKeywords {
+			if strings.Contains(lowerMessage, keyword) {
+				return &dto.AIIntentClassification{
+					Intent:               lastTurn.Intent,
+					ToolName:             lastTurn.ToolName,
+					NeedsChart:           true,
+					ChartType:            "",
+					Reason:               "follow-up inherited previous intent and tool",
+					ConfidenceScore:      1.0,
+					ClassificationSource: "follow_up_memory",
+				}, nil
+			}
 		}
 	}
 
-	if strings.Contains(lowerMessage, "variance") ||
-		strings.Contains(lowerMessage, "prediction") ||
-		strings.Contains(lowerMessage, "deviation") ||
-		strings.Contains(lowerMessage, "actual vs") {
+	bestScore := 0
+	var bestRule *IntentRule
 
-		return &dto.AIIntentClassification{
-			Intent:     "recipe_variance",
-			ToolName:   "top_recipe_variance",
-			NeedsChart: true,
-			ChartType:  "bar",
-			Reason:     "matched recipe variance keywords",
-		}, nil
+	for i := range intentRules {
+		rule := &intentRules[i]
+		score := 0
+
+		for _, keyword := range rule.Keywords {
+			if strings.Contains(lowerMessage, keyword) {
+				score++
+			}
+		}
+
+		if score > bestScore {
+			bestScore = score
+			bestRule = rule
+		}
 	}
 
-	if strings.Contains(lowerMessage, "ingredient") ||
-		strings.Contains(lowerMessage, "protein") ||
-		strings.Contains(lowerMessage, "carbohydrate") ||
-		strings.Contains(lowerMessage, "oil") ||
-		strings.Contains(lowerMessage, "category") {
+	if bestRule != nil && bestScore > 0 {
+		confidenceScore := calculateRuleConfidence(
+			bestScore,
+			len(bestRule.Keywords),
+		)
 
-		return &dto.AIIntentClassification{
-			Intent:     "ingredient_category_usage",
-			ToolName:   "ingredient_category_usage",
-			NeedsChart: true,
-			ChartType:  "bar",
-			Reason:     "matched ingredient usage keywords",
-		}, nil
-	}
-
-	if strings.Contains(lowerMessage, "site") ||
-		strings.Contains(lowerMessage, "branch") ||
-		strings.Contains(lowerMessage, "performing") ||
-		strings.Contains(lowerMessage, "performance") ||
-		strings.Contains(lowerMessage, "workload") {
-
-		return &dto.AIIntentClassification{
-			Intent:     "branch_performance",
-			ToolName:   "branch_summary",
-			NeedsChart: true,
-			ChartType:  "bar",
-			Reason:     "matched site performance keywords",
-		}, nil
-	}
-
-	if strings.Contains(lowerMessage, "daily plan") ||
-		strings.Contains(lowerMessage, "planning") ||
-		strings.Contains(lowerMessage, "draft") ||
-		strings.Contains(lowerMessage, "finalized") {
-
-		return &dto.AIIntentClassification{
-			Intent:     "daily_plan_summary",
-			ToolName:   "daily_plan_summary",
-			NeedsChart: true,
-			ChartType:  "pie",
-			Reason:     "matched daily plan keywords",
-		}, nil
-	}
-
-	if strings.Contains(lowerMessage, "summary") ||
-		strings.Contains(lowerMessage, "summarize") ||
-		strings.Contains(lowerMessage, "overview") ||
-		strings.Contains(lowerMessage, "management") ||
-		strings.Contains(lowerMessage, "executive") {
-
-		return &dto.AIIntentClassification{
-			Intent:     "executive_summary",
-			ToolName:   "executive_summary",
-			NeedsChart: true,
-			ChartType:  "line",
-			Reason:     "matched executive summary keywords",
-		}, nil
+		if confidenceScore >= minimumRuleConfidence {
+			return &dto.AIIntentClassification{
+				Intent:               bestRule.Intent,
+				ToolName:             bestRule.ToolName,
+				NeedsChart:           bestRule.NeedsChart,
+				ChartType:            bestRule.ChartType,
+				Reason:               "matched scored intent rule with enough confidence",
+				ConfidenceScore:      confidenceScore,
+				ClassificationSource: "rule_classifier",
+			}, nil
+		}
 	}
 
 	conversationContext := ""
@@ -222,6 +335,14 @@ Required JSON shape:
 	err = json.Unmarshal([]byte(content), &result)
 	if err != nil {
 		return nil, err
+	}
+
+	result.ConfidenceScore = 0.75
+	result.ClassificationSource = "llm_router"
+
+	if !IsApprovedAITool(result.ToolName) {
+		fallback := GetSafeFallbackClassification()
+		return &fallback, nil
 	}
 
 	return &result, nil

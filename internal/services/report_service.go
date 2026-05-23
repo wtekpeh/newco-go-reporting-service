@@ -823,3 +823,12 @@ func (s *ReportService) DailyPlanSummary(
 
 	return s.Repo.DailyPlanSummary(filters)
 }
+
+func (s *ReportService) GetAIPlanningRiskSummary(
+	filters dto.ReportFiltersDTO,
+) (dto.AIPlanningRiskSummaryDTO, error) {
+
+	return s.Repo.GetAIPlanningRiskSummary(
+		filters,
+	)
+}

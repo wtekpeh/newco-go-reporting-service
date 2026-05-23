@@ -11,6 +11,10 @@ type AIConversationTurn struct {
 
 	ToolName string `json:"tool_name"`
 
+	Focus string `json:"focus"`
+
+	ReasoningMode string `json:"reasoning_mode"`
+
 	StartDate string `json:"start_date"`
 
 	EndDate string `json:"end_date"`

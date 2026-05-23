@@ -44,7 +44,7 @@ func (s *OllamaService) Chat(
 		Stream: false,
 		Think:  &think,
 		Options: map[string]interface{}{
-			"num_predict": 80,
+			"num_predict": 500,
 			"temperature": 0.1,
 		},
 		Messages: []dto.OllamaMessage{
@@ -106,33 +106,77 @@ func (s *OllamaService) Chat(
 }
 
 func cleanAssistantContent(content string) string {
-	markers := []string{
-		"Final answer:",
-		"Final Answer:",
-		"Answer:",
-		"ANSWER:",
+	cleaned := strings.TrimSpace(content)
+
+	// Remove explicit think tags
+	cleaned = strings.ReplaceAll(cleaned, "<think>", "")
+	cleaned = strings.ReplaceAll(cleaned, "</think>", "")
+
+	lines := strings.Split(cleaned, "\n")
+
+	filteredLines := []string{}
+
+	skipPrefixes := []string{
+		"okay",
+		"let's",
+		"first",
+		"i need to",
+		"looking at",
+		"the user is asking",
+		"the key here",
+		"wait",
+		"hmm",
+		"so the answer should",
+		"the question is",
+		"the approved facts show",
+		"from the data",
+		"the main point",
+		"we are given",
+		"we must",
+		"we cannot",
+		"the instruction",
+		"the problem says",
+		"however",
+		"but the user",
+		"since the approved facts",
+		"the approved facts do not",
+		"therefore",
+		"possible next steps",
 	}
 
-	for _, marker := range markers {
-		if strings.Contains(content, marker) {
-			parts := strings.Split(content, marker)
-			return strings.TrimSpace(parts[len(parts)-1])
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		if trimmed == "" {
+			continue
 		}
-	}
 
-	reasoningStarters := []string{
-		"Okay,",
-		"Let's",
-		"First,",
-		"I need to",
-		"Looking at",
-	}
+		lower := strings.ToLower(trimmed)
 
-	for _, starter := range reasoningStarters {
-		if strings.HasPrefix(strings.TrimSpace(content), starter) {
-			return ""
+		shouldSkip := false
+
+		for _, prefix := range skipPrefixes {
+			if strings.HasPrefix(lower, prefix) {
+				shouldSkip = true
+				break
+			}
 		}
+
+		if shouldSkip {
+			continue
+		}
+
+		filteredLines = append(filteredLines, trimmed)
 	}
 
-	return strings.TrimSpace(content)
+	finalResponse := strings.TrimSpace(
+		strings.Join(filteredLines, "\n"),
+	)
+
+	// Safety fallback
+	if finalResponse == "" {
+		return strings.TrimSpace(content)
+	}
+
+	return finalResponse
 }

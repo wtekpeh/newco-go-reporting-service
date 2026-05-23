@@ -156,6 +156,26 @@ const AIBranchPerformanceQuery = `
 	         b.name ASC
 `
 
+const AIPlanningRiskSummaryQuery = `
+	SELECT
+		COUNT(*) AS total_plans,
+
+		COUNT(*) FILTER (
+			WHERE status = 'draft'
+		) AS draft_plans,
+
+		COUNT(*) FILTER (
+			WHERE status = 'final'
+		) AS finalized_plans,
+
+		0 AS plans_missing_actuals
+
+	FROM cooking_dailyconsumptionplan
+
+	WHERE ($1 = '' OR used_date >= $1::date)
+	  AND ($2 = '' OR used_date <= $2::date)
+`
+
 const RoleDistributionQuery = `
 	SELECT role, COUNT(*) AS count
 	FROM accounts_branchroleassignment

@@ -1,5 +1,7 @@
 package services
 
+import "newco-go-reporting-service/internal/ai/dto"
+
 type AIToolDefinition struct {
 	Name        string
 	Intent      string
@@ -32,6 +34,11 @@ var ApprovedAITools = map[string]AIToolDefinition{
 		Intent:      "daily_plan_summary",
 		Description: "Daily plan totals, finalized plans, drafts, and planning progress.",
 	},
+	"planning_risk_summary": {
+		Name:        "planning_risk_summary",
+		Intent:      "planning_risk_summary",
+		Description: "Planning readiness, finalized/draft daily plans, requisition risk, and management attention areas.",
+	},
 	"none": {
 		Name:        "none",
 		Intent:      "general_advice",
@@ -42,4 +49,16 @@ var ApprovedAITools = map[string]AIToolDefinition{
 func IsApprovedAITool(toolName string) bool {
 	_, ok := ApprovedAITools[toolName]
 	return ok
+}
+
+func GetSafeFallbackClassification() dto.AIIntentClassification {
+	return dto.AIIntentClassification{
+		Intent:               "general_advice",
+		ToolName:             "none",
+		NeedsChart:           false,
+		ChartType:            "",
+		Reason:               "invalid or unapproved tool returned by classifier",
+		ConfidenceScore:      0,
+		ClassificationSource: "safety_fallback",
+	}
 }
