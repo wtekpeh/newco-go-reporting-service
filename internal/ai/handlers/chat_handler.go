@@ -203,11 +203,11 @@ func determineReasoningMode(message string) string {
 		strings.Contains(lowerMessage, "advice") ||
 		strings.Contains(lowerMessage, "what should") ||
 		strings.Contains(lowerMessage, "what next") ||
+		strings.Contains(lowerMessage, "what do we do") ||
 		strings.Contains(lowerMessage, "management do") ||
 		strings.Contains(lowerMessage, "do next") {
 		return "recommendation"
 	}
-
 	if strings.Contains(lowerMessage, "redistribute") ||
 		strings.Contains(lowerMessage, "staff") ||
 		strings.Contains(lowerMessage, "move staff") {
@@ -539,7 +539,16 @@ Approved operational facts:
 
 			} else if conversationFocus == "overloaded_site" {
 
-				if conversationReasoningMode == "explanation" {
+				if conversationReasoningMode == "recommendation" {
+
+					assistantResponse = fmt.Sprintf(
+						"Management should review workload distribution immediately. %s is handling %d consumptions with only %d staff, while the other sites recorded little or no activity. The next step is to check whether some work or support can be moved to underutilized sites.",
+						topSite.BranchName,
+						topSite.TotalBatches,
+						topSite.StaffCount,
+					)
+
+				} else if conversationReasoningMode == "explanation" {
 
 					assistantResponse = fmt.Sprintf(
 						"%s appears overloaded because it handled %d consumptions with only %d staff, while the other sites recorded little or no activity during the selected period.",

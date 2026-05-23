@@ -194,6 +194,7 @@ func (c *IntentClassifier) Classify(
 			"that's so",
 			"tell me more",
 			"more detail",
+			"what do we do",
 		}
 
 		for _, keyword := range followUpKeywords {
@@ -339,7 +340,22 @@ Required JSON shape:
 
 	err = json.Unmarshal([]byte(content), &result)
 	if err != nil {
-		return nil, err
+		if len(recentTurns) > 0 {
+			lastTurn := recentTurns[len(recentTurns)-1]
+
+			return &dto.AIIntentClassification{
+				Intent:               lastTurn.Intent,
+				ToolName:             lastTurn.ToolName,
+				NeedsChart:           true,
+				ChartType:            "",
+				Reason:               "LLM router returned non-JSON; inherited previous intent and tool",
+				ConfidenceScore:      0.5,
+				ClassificationSource: "llm_router_fallback_memory",
+			}, nil
+		}
+
+		fallback := GetSafeFallbackClassification()
+		return &fallback, nil
 	}
 
 	result.ConfidenceScore = 0.75
