@@ -512,78 +512,61 @@ Approved operational facts:
 			})
 		}
 
-		if assistantResponse == "" && len(branchSummary) > 0 {
+		if (assistantResponse == "" ||
+			assistantResponse == "No tool execution implemented yet.") &&
+			len(branchSummary) > 0 {
+
 			topSite := branchSummary[0]
 
-			assistantResponse = fmt.Sprintf(
-				"%s appears operationally significant based on the current site activity data, with %d consumptions handled by %d staff during the selected period.",
-				topSite.BranchName,
-				topSite.TotalBatches,
-				topSite.StaffCount,
-			)
-		}
+			if conversationFocus == "best_performing_site" {
 
-		/*
-
-			if len(branchSummary) > 0 {
-				topSite := branchSummary[0]
-
-				if conversationFocus == "best_performing_site" {
-
-				} else if conversationFocus == "overloaded_site" {
-
-					if conversationReasoningMode == "recommendation" {
-						assistantResponse = fmt.Sprintf(
-							"Management should review workload distribution immediately. %s is carrying most of the consumption activity with only %d staff, so the next step should be to compare staff allocation across sites and consider temporary support or redistribution from underutilized sites.",
-							topSite.BranchName,
-							topSite.StaffCount,
-						)
-
-					} else if conversationReasoningMode == "risk_analysis" {
-						assistantResponse = fmt.Sprintf(
-							"The main risk is operational pressure on %s. With only %d staff handling most consumption activity, the site may face delays, staff fatigue, planning errors, or weaker control over ingredient usage if the workload continues like this.",
-							topSite.BranchName,
-							topSite.StaffCount,
-						)
-
-					} else if conversationReasoningMode == "explanation" {
-						assistantResponse = fmt.Sprintf(
-							"%s appears overloaded because it is handling nearly all consumptions with only %d staff while other sites remain underutilized.",
-							topSite.BranchName,
-							topSite.StaffCount,
-						)
-
-					} else {
-						assistantResponse = fmt.Sprintf(
-							"%s appears operationally overloaded because it is handling nearly all consumptions with only %d staff.",
-							topSite.BranchName,
-							topSite.StaffCount,
-						)
-					}
-
-				} else if conversationFocus == "staff_distribution" {
+				if conversationReasoningMode == "explanation" {
 
 					assistantResponse = fmt.Sprintf(
-						"Management should review staff distribution across sites. %s is currently handling most operational activity with only %d staff, while other sites remain underutilized.",
+						"%s is performing best because it recorded the highest consumption activity during the selected period, with %d consumptions compared with the other sites.",
 						topSite.BranchName,
-						topSite.StaffCount,
+						topSite.TotalBatches,
 					)
-
-				} else if conversationFocus == "inactive_sites" {
-
-					assistantResponse = "Several sites appear operationally inactive with little or no recorded consumptions during the selected period."
 
 				} else {
 
 					assistantResponse = fmt.Sprintf(
-						"%s is performing best with %d consumptions and %d staff.",
+						"%s is currently performing best with %d consumptions recorded during the selected period.",
+						topSite.BranchName,
+						topSite.TotalBatches,
+					)
+				}
+
+			} else if conversationFocus == "overloaded_site" {
+
+				if conversationReasoningMode == "explanation" {
+
+					assistantResponse = fmt.Sprintf(
+						"%s appears overloaded because it handled %d consumptions with only %d staff, while the other sites recorded little or no activity during the selected period.",
+						topSite.BranchName,
+						topSite.TotalBatches,
+						topSite.StaffCount,
+					)
+
+				} else {
+
+					assistantResponse = fmt.Sprintf(
+						"%s appears operationally overloaded with %d consumptions handled by %d staff.",
 						topSite.BranchName,
 						topSite.TotalBatches,
 						topSite.StaffCount,
 					)
 				}
+
+			} else {
+
+				assistantResponse = fmt.Sprintf(
+					"%s is the most active site with %d consumptions recorded during the selected period.",
+					topSite.BranchName,
+					topSite.TotalBatches,
+				)
 			}
-		*/
+		}
 
 		chartData["branch_summary"] = branchSummary
 
