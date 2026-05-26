@@ -36,6 +36,29 @@ func NewIntentClassifier(
 
 var intentRules = []IntentRule{
 	{
+		Intent:     "ingredient_variance_risk",
+		ToolName:   "ingredient_variance_risk",
+		ChartType:  "bar",
+		NeedsChart: true,
+		Keywords: []string{
+			"ingredient variance",
+			"ingredient risk",
+			"ingredient usage risk",
+			"planned versus actual",
+			"planned vs actual",
+			"actual versus planned",
+			"actual vs planned",
+			"usage variance",
+			"consumption variance",
+			"variance risk",
+			"which ingredient is off",
+			"which ingredients are off",
+			"ingredients have the highest",
+			"highest planned vs actual",
+		},
+	},
+
+	{
 		Intent:     "recipe_variance",
 		ToolName:   "top_recipe_variance",
 		ChartType:  "bar",
@@ -129,6 +152,27 @@ var intentRules = []IntentRule{
 			"this week",
 			"ready for execution",
 			"not ready",
+		},
+	},
+
+	{
+		Intent:     "ingredient_variance_risk",
+		ToolName:   "ingredient_variance_risk",
+		ChartType:  "bar",
+		NeedsChart: true,
+		Keywords: []string{
+			"ingredient variance",
+			"ingredient risk",
+			"ingredient usage risk",
+			"planned versus actual",
+			"planned vs actual",
+			"actual versus planned",
+			"actual vs planned",
+			"usage variance",
+			"consumption variance",
+			"variance risk",
+			"which ingredient is off",
+			"which ingredients are off",
 		},
 	},
 
@@ -300,19 +344,31 @@ Use when the user asks for a general executive overview, management summary, ope
 tool_name: ingredient_category_usage
 Use when the user asks about ingredients, ingredient categories, consumption by category, protein/carbohydrate/oil usage, or ingredient quantities.
 
-3. recipe_variance
-tool_name: top_recipe_variance
-Use when the user asks about prediction accuracy, variance, recipes with high deviation, actual vs predicted, or recipe planning errors.
+3. ingredient_variance_risk
+tool_name: ingredient_variance_risk
+Use when the user asks about ingredient planned versus actual usage, ingredient variance, usage variance, ingredient control risk, or ingredients that are off.
 
-4. branch_performance
+4. recipe_variance
+tool_name: top_recipe_variance
+Use when the user asks about prediction accuracy, recipe variance, recipes with high deviation, actual vs predicted, or recipe planning errors.
+
+5. branch_performance
 tool_name: branch_summary
 Use when the user asks about branch/site performance, most active branch, site comparison, or branch workload.
 
-5. daily_plan_summary
+6. daily_plan_summary
 tool_name: daily_plan_summary
 Use when the user asks about daily plans, finalized plans, draft plans, planning progress, or requisition planning.
 
-6. general_advice
+7. planning_risk_summary
+tool_name: planning_risk_summary
+Use when the user asks about planning risks, planning concerns, upcoming plan readiness, daily plan risks, or requisition risks.
+
+8. ingredient_variance_risk
+tool_name: ingredient_variance_risk
+Use when the user asks about ingredient planned versus actual usage, ingredient variance, usage variance, ingredient control risk, or ingredients that are off.
+
+9. general_advice
 tool_name: none
 Use when the user asks for general operational advice that does not require data.
 

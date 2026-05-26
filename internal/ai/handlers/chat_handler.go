@@ -657,6 +657,93 @@ Approved operational facts:
 		})
 	}
 
+	if classification.ToolName == "ingredient_variance_risk" {
+
+		filters := reportdto.ReportFiltersDTO{
+			StartDate: request.StartDate,
+			EndDate:   request.EndDate,
+		}
+
+		if request.BranchID != nil {
+			filters.BranchID = strconv.FormatInt(*request.BranchID, 10)
+		}
+
+		ingredientVarianceRisk, err := h.ReportService.GetAIIngredientVarianceRisk(
+			filters,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to fetch ingredient variance risk",
+				"error":   err.Error(),
+			})
+		}
+
+		chartData["ingredient_variance_risk"] = ingredientVarianceRisk
+
+		if len(ingredientVarianceRisk.Items) == 0 {
+			assistantResponse = "No ingredient variance risk was detected from finalized consumptions with recorded actual values."
+		} else {
+
+			topItem := ingredientVarianceRisk.Items[0]
+
+			lowerMessage := strings.ToLower(request.Message)
+
+			isExplanationFollowUp :=
+				strings.Contains(lowerMessage, "why") ||
+					strings.Contains(lowerMessage, "how so") ||
+					strings.Contains(lowerMessage, "explain")
+
+			isRecommendationFollowUp :=
+				strings.Contains(lowerMessage, "what should management do") ||
+					strings.Contains(lowerMessage, "what should we do") ||
+					strings.Contains(lowerMessage, "what do we do") ||
+					strings.Contains(lowerMessage, "what next") ||
+					strings.Contains(lowerMessage, "recommend") ||
+					strings.Contains(lowerMessage, "recommendation")
+
+			if isExplanationFollowUp {
+
+				assistantResponse = fmt.Sprintf(
+					"%s shows %.2f%% variance between planned and actual usage. Planned value was %.2f %s while actual usage was %.2f %s across %d finalized consumptions. This indicates that operational execution differed from planning assumptions.",
+					topItem.Ingredient,
+					topItem.VariancePercent,
+					topItem.TotalPlannedValue,
+					topItem.Unit,
+					topItem.TotalActualValue,
+					topItem.Unit,
+					topItem.TotalConsumptions,
+				)
+
+			} else if isRecommendationFollowUp {
+
+				assistantResponse = fmt.Sprintf(
+					"Management should review %s because it has %.2f%% variance between planned and actual usage across %d finalized consumptions. The first action is to compare recent planning assumptions against actual kitchen execution, then confirm whether the variance came from portion changes, recording errors, supplier/unit differences, or recipe scaling issues. Since the risk level is %s, this should be monitored and corrected before it becomes a recurring planning control issue.",
+					topItem.Ingredient,
+					topItem.VariancePercent,
+					topItem.TotalConsumptions,
+					topItem.RiskLevel,
+				)
+			} else {
+
+				assistantResponse = fmt.Sprintf(
+					"Ingredient Variance Risk\n\nHighest Risk Level: %s\n\nTop Ingredient: %s has %.2f%% variance between planned and actual usage.\n\nManagement Attention: %s",
+					ingredientVarianceRisk.HighestRiskLevel,
+					topItem.Ingredient,
+					topItem.VariancePercent,
+					strings.Join(ingredientVarianceRisk.ManagementAttention, " "),
+				)
+			}
+		}
+
+		chartSuggestions = append(chartSuggestions, dto.AIChartSuggestion{
+			ChartType: "bar",
+			Title:     "Ingredient Variance Risk",
+			Dataset:   "ingredient_variance_risk",
+			XField:    "ingredient",
+			YField:    "variance_percent",
+		})
+	}
+
 	if classification.ToolName == "daily_plan_summary" {
 
 		filters := reportdto.ReportFiltersDTO{

@@ -954,3 +954,98 @@ func (r *ReportRepository) GetAIPlanningRiskSummary(
 
 	return summary, nil
 }
+
+func (r *ReportRepository) GetAIIngredientVarianceRisk(
+	filters dto.ReportFiltersDTO,
+) (dto.AIIngredientVarianceRiskDTO, error) {
+
+	rows, err := r.DB.Query(
+		context.Background(),
+		queries.AIIngredientVarianceRiskQuery,
+		filters.StartDate,
+		filters.EndDate,
+		filters.BranchID,
+	)
+	if err != nil {
+		return dto.AIIngredientVarianceRiskDTO{}, err
+	}
+	defer rows.Close()
+
+	result := dto.AIIngredientVarianceRiskDTO{
+		Items:               []dto.AIIngredientVarianceRiskItemDTO{},
+		HighestRiskLevel:    "low",
+		RiskReasons:         []string{},
+		ManagementAttention: []string{},
+	}
+
+	for rows.Next() {
+		var item dto.AIIngredientVarianceRiskItemDTO
+
+		err := rows.Scan(
+			&item.Ingredient,
+			&item.Unit,
+			&item.TotalPlannedValue,
+			&item.TotalActualValue,
+			&item.VarianceValue,
+			&item.VariancePercent,
+			&item.TotalConsumptions,
+		)
+		if err != nil {
+			return result, err
+		}
+
+		if item.VariancePercent >= 30 {
+			item.RiskLevel = "high"
+			item.RiskReason = "Actual usage is significantly different from planned usage."
+			result.HighestRiskLevel = "high"
+		} else if item.VariancePercent >= 15 {
+			item.RiskLevel = "medium"
+			item.RiskReason = "Actual usage is moderately different from planned usage."
+
+			if result.HighestRiskLevel != "high" {
+				result.HighestRiskLevel = "medium"
+			}
+		} else {
+			item.RiskLevel = "low"
+			item.RiskReason = "Actual usage is close to planned usage."
+		}
+
+		result.Items = append(result.Items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return result, err
+	}
+
+	if len(result.RiskReasons) == 0 {
+		for _, item := range result.Items {
+			if item.RiskLevel == "high" || item.RiskLevel == "medium" {
+				result.RiskReasons = append(
+					result.RiskReasons,
+					item.Ingredient+" has noticeable planned versus actual usage variance.",
+				)
+			}
+		}
+	}
+
+	if len(result.ManagementAttention) == 0 {
+		if result.HighestRiskLevel == "high" {
+			result.ManagementAttention = append(
+				result.ManagementAttention,
+				"Review high-variance ingredients and confirm whether recipes, planning assumptions, or execution records need adjustment.",
+			)
+		} else if result.HighestRiskLevel == "medium" {
+			result.ManagementAttention = append(
+				result.ManagementAttention,
+				"Monitor medium-variance ingredients and compare them against recent operational patterns.",
+			)
+		} else {
+			result.ManagementAttention = append(
+				result.ManagementAttention,
+				"Ingredient usage appears close to planned values.",
+			)
+		}
+	}
+
+	return result, nil
+}

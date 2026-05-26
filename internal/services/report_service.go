@@ -832,3 +832,10 @@ func (s *ReportService) GetAIPlanningRiskSummary(
 		filters,
 	)
 }
+
+func (s *ReportService) GetAIIngredientVarianceRisk(
+	filters dto.ReportFiltersDTO,
+) (dto.AIIngredientVarianceRiskDTO, error) {
+
+	return s.Repo.GetAIIngredientVarianceRisk(filters)
+}

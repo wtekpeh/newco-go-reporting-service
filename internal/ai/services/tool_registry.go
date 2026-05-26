@@ -39,6 +39,11 @@ var ApprovedAITools = map[string]AIToolDefinition{
 		Intent:      "planning_risk_summary",
 		Description: "Planning readiness, finalized/draft daily plans, requisition risk, and management attention areas.",
 	},
+	"ingredient_variance_risk": {
+		Name:        "ingredient_variance_risk",
+		Intent:      "ingredient_variance_risk",
+		Description: "Ingredient planned versus actual consumption variance risk and management attention areas.",
+	},
 	"none": {
 		Name:        "none",
 		Intent:      "general_advice",

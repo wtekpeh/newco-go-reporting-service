@@ -516,3 +516,61 @@ const DailyPlanSummaryQuery = `
 	ORDER BY count DESC,
 	         status ASC
 `
+
+const AIIngredientVarianceRiskQuery = `
+	SELECT
+		cbi.ingredient,
+
+		CASE
+			WHEN LOWER(cbi.ingredient) LIKE '%kenkey%' THEN 'pc'
+			WHEN LOWER(cbi.ingredient) LIKE '%oil%' THEN 'ml'
+			ELSE 'g'
+		END AS unit,
+
+		ROUND(SUM(COALESCE(cbi.final_g, 0))::numeric, 3) AS total_planned_value,
+		ROUND(SUM(COALESCE(cbi.actual_g, 0))::numeric, 3) AS total_actual_value,
+
+		ROUND(
+			(SUM(COALESCE(cbi.actual_g, 0)) - SUM(COALESCE(cbi.final_g, 0)))::numeric,
+			3
+		) AS variance_value,
+
+		ROUND(
+			(
+				ABS(SUM(COALESCE(cbi.actual_g, 0)) - SUM(COALESCE(cbi.final_g, 0)))
+				/
+				NULLIF(SUM(COALESCE(cbi.final_g, 0)), 0)
+				* 100
+			)::numeric,
+			2
+		) AS variance_percent,
+
+		COUNT(DISTINCT cb.id) AS total_consumptions
+
+	FROM cooking_cookbatchitem cbi
+
+	JOIN cooking_cookbatch cb
+		ON cb.id = cbi.batch_id
+
+	WHERE cb.status = 'final'
+	  AND cbi.actual_g IS NOT NULL
+	  AND ($1 = '' OR cb.used_date >= $1::date)
+	  AND ($2 = '' OR cb.used_date <= $2::date)
+	  AND ($3 = '' OR cb.branch_id::text = $3)
+
+	GROUP BY
+		cbi.ingredient,
+		CASE
+			WHEN LOWER(cbi.ingredient) LIKE '%kenkey%' THEN 'pc'
+			WHEN LOWER(cbi.ingredient) LIKE '%oil%' THEN 'ml'
+			ELSE 'g'
+		END
+
+	HAVING SUM(COALESCE(cbi.final_g, 0)) > 0
+
+	ORDER BY variance_percent DESC,
+	         ABS(SUM(COALESCE(cbi.actual_g, 0)) - SUM(COALESCE(cbi.final_g, 0))) DESC,
+	         cbi.ingredient ASC
+
+	LIMIT 10
+`

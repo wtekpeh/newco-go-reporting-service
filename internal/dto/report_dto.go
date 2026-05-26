@@ -261,3 +261,22 @@ type AIPlanningRiskSummaryDTO struct {
 
 	ManagementAttention []string `json:"management_attention"`
 }
+
+type AIIngredientVarianceRiskItemDTO struct {
+	Ingredient        string  `json:"ingredient"`
+	Unit              string  `json:"unit"`
+	TotalPlannedValue float64 `json:"total_planned_value"`
+	TotalActualValue  float64 `json:"total_actual_value"`
+	VarianceValue     float64 `json:"variance_value"`
+	VariancePercent   float64 `json:"variance_percent"`
+	TotalConsumptions int     `json:"total_consumptions"`
+	RiskLevel         string  `json:"risk_level"`
+	RiskReason        string  `json:"risk_reason"`
+}
+
+type AIIngredientVarianceRiskDTO struct {
+	Items               []AIIngredientVarianceRiskItemDTO `json:"items"`
+	HighestRiskLevel    string                            `json:"highest_risk_level"`
+	RiskReasons         []string                          `json:"risk_reasons"`
+	ManagementAttention []string                          `json:"management_attention"`
+}
