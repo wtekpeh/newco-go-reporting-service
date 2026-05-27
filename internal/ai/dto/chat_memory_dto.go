@@ -23,5 +23,7 @@ type AIConversationTurn struct {
 
 	AssistantResponse string `json:"assistant_response"`
 
+	OperationalContext string `json:"operational_context"`
+
 	CreatedAt time.Time `json:"created_at"`
 }

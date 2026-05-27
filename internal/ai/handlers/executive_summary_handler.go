@@ -42,7 +42,7 @@ Do not include chain-of-thought.
 Respond in concise executive language.
 `
 
-	executiveContext, err := h.ContextBuilder.BuildExecutiveSummaryContext(
+	executiveContext, _, err := h.ContextBuilder.BuildExecutiveSummaryContext(
 		c.UserContext(),
 		request,
 	)

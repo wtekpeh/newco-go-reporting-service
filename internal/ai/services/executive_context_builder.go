@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	aidto "newco-go-reporting-service/internal/ai/dto"
@@ -71,7 +73,7 @@ type ExecutiveAITopRecipeVariance struct {
 func (b *ExecutiveContextBuilder) BuildExecutiveSummaryContext(
 	ctx context.Context,
 	request aidto.ExecutiveSummaryRequest,
-) (string, error) {
+) (string, ExecutiveAIContext, error) {
 
 	filters := reportdto.ReportFiltersDTO{
 		StartDate: request.StartDate,
@@ -84,72 +86,79 @@ func (b *ExecutiveContextBuilder) BuildExecutiveSummaryContext(
 
 	totalUsers, err := b.ReportService.TotalUsers(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	totalActiveUsers, err := b.ReportService.TotalActiveUsers(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	totalBranches, err := b.ReportService.TotalBranches()
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	totalBatches, err := b.ReportService.TotalBatches(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	totalDailyPlans, err := b.ReportService.TotalDailyPlans(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	finalizedDailyPlans, err := b.ReportService.FinalizedDailyPlans(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	draftDailyPlans, err := b.ReportService.DraftDailyPlans(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	mostActiveBranch, err := b.ReportService.MostActiveBranch(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	largestBranch, err := b.ReportService.LargestBranch(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	mostUsedRecipe, err := b.ReportService.MostUsedRecipe(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	averageBatchesPerBranch, err := b.ReportService.AverageBatchesPerBranch(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	peakBatchDay, err := b.ReportService.PeakBatchDay(filters)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
-	startDate, err := time.Parse("2006-01-02", request.StartDate)
-	if err != nil {
-		return "", err
+	var startDate time.Time
+	var endDate time.Time
+
+	if request.StartDate != "" {
+		startDate, err = time.Parse("2006-01-02", request.StartDate)
+		if err != nil {
+			return "", ExecutiveAIContext{}, err
+		}
 	}
 
-	endDate, err := time.Parse("2006-01-02", request.EndDate)
-	if err != nil {
-		return "", err
+	if request.EndDate != "" {
+		endDate, err = time.Parse("2006-01-02", request.EndDate)
+		if err != nil {
+			return "", ExecutiveAIContext{}, err
+		}
 	}
 
 	ingredientCategoryReport, err := b.ReportService.GetIngredientCategoryDaily(
@@ -158,10 +167,10 @@ func (b *ExecutiveContextBuilder) BuildExecutiveSummaryContext(
 		endDate,
 	)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	ingredientCategories := []ExecutiveAIIngredientCategory{}
@@ -193,7 +202,7 @@ func (b *ExecutiveContextBuilder) BuildExecutiveSummaryContext(
 		branchID,
 	)
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
 	for _, item := range topRecipeVarianceResult.Items {
@@ -234,8 +243,255 @@ func (b *ExecutiveContextBuilder) BuildExecutiveSummaryContext(
 
 	jsonBytes, err := json.MarshalIndent(aiContext, "", "  ")
 	if err != nil {
-		return "", err
+		return "", ExecutiveAIContext{}, err
 	}
 
-	return string(jsonBytes), nil
+	jsonString := string(jsonBytes)
+
+	jsonString = strings.ReplaceAll(
+		jsonString,
+		"branches",
+		"sites",
+	)
+
+	jsonString = strings.ReplaceAll(
+		jsonString,
+		"Branches",
+		"Sites",
+	)
+
+	jsonString = strings.ReplaceAll(
+		jsonString,
+		"branch",
+		"site",
+	)
+
+	jsonString = strings.ReplaceAll(
+		jsonString,
+		"Branch",
+		"Site",
+	)
+
+	jsonString = strings.ReplaceAll(
+		jsonString,
+		"batches",
+		"consumptions",
+	)
+
+	jsonString = strings.ReplaceAll(
+		jsonString,
+		"Batches",
+		"Consumptions",
+	)
+
+	jsonString = strings.ReplaceAll(
+		jsonString,
+		"batch",
+		"consumption",
+	)
+
+	jsonString = strings.ReplaceAll(
+		jsonString,
+		"Batch",
+		"Consumption",
+	)
+
+	return jsonString, aiContext, nil
+}
+
+func BuildExecutiveSummaryNarrative(
+	context ExecutiveAIContext,
+) string {
+
+	summary := fmt.Sprintf(
+		"Operations remain active across %d sites with %d total consumptions.",
+		context.KPIs.TotalBranches,
+		context.KPIs.TotalBatches,
+	)
+
+	summary += "\n\nKey highlights:\n"
+
+	summary += fmt.Sprintf(
+		"- Daily planning is complete with %d finalized plans and %d drafts currently pending.\n",
+		context.KPIs.FinalizedDailyPlans,
+		context.KPIs.DraftDailyPlans,
+	)
+
+	mostActiveSiteBytes, _ := json.Marshal(
+		context.Highlights.MostActiveBranch,
+	)
+
+	var mostActiveSite map[string]any
+
+	json.Unmarshal(
+		mostActiveSiteBytes,
+		&mostActiveSite,
+	)
+
+	siteName := mostActiveSite["branch_name"]
+	consumptionCount := mostActiveSite["batch_count"]
+
+	if siteName != nil {
+		summary += fmt.Sprintf(
+			"- %v remains the most active site with %v consumptions.\n",
+			siteName,
+			consumptionCount,
+		)
+	}
+
+	largestSiteBytes, _ := json.Marshal(
+		context.Highlights.LargestBranch,
+	)
+
+	var largestSite map[string]any
+
+	json.Unmarshal(
+		largestSiteBytes,
+		&largestSite,
+	)
+
+	largestSiteName := largestSite["branch_name"]
+	staffCount := largestSite["staff_count"]
+
+	if largestSiteName != nil {
+		summary += fmt.Sprintf(
+			"- %v is currently the largest operational site with %v staff.\n",
+			largestSiteName,
+			staffCount,
+		)
+	}
+
+	mostUsedRecipeBytes, _ := json.Marshal(
+		context.Highlights.MostUsedRecipe,
+	)
+
+	var mostUsedRecipe map[string]any
+
+	json.Unmarshal(
+		mostUsedRecipeBytes,
+		&mostUsedRecipe,
+	)
+
+	recipeName := mostUsedRecipe["recipe_name"]
+	recipeConsumptionCount := mostUsedRecipe["batch_count"]
+
+	if recipeName != nil {
+		summary += fmt.Sprintf(
+			"- %v is the most frequently used recipe with %v consumptions.\n",
+			recipeName,
+			recipeConsumptionCount,
+		)
+	}
+
+	peakDayBytes, _ := json.Marshal(
+		context.Highlights.PeakBatchDay,
+	)
+
+	var peakDay map[string]any
+
+	json.Unmarshal(
+		peakDayBytes,
+		&peakDay,
+	)
+
+	peakDayName := peakDay["day_name"]
+	peakConsumptionCount := peakDay["batch_count"]
+
+	if peakDayName != nil {
+		summary += fmt.Sprintf(
+			"- %v recorded the highest operational activity with %v consumptions.\n",
+			peakDayName,
+			peakConsumptionCount,
+		)
+	}
+
+	if len(context.TopRecipeVariance) > 0 {
+		summary += fmt.Sprintf(
+			"- %s recorded the highest recipe variance at %.1f%%.\n",
+			context.TopRecipeVariance[0].RecipeName,
+			context.TopRecipeVariance[0].VariancePercent,
+		)
+	}
+
+	return summary
+}
+
+func BuildExecutiveSummaryExplanation(
+	context ExecutiveAIContext,
+) string {
+
+	explanation := "I say that because the operational summary shows "
+
+	explanation += fmt.Sprintf(
+		"%d total consumptions across %d sites. ",
+		context.KPIs.TotalBatches,
+		context.KPIs.TotalBranches,
+	)
+
+	mostActiveSiteBytes, _ := json.Marshal(
+		context.Highlights.MostActiveBranch,
+	)
+
+	var mostActiveSite map[string]any
+
+	json.Unmarshal(
+		mostActiveSiteBytes,
+		&mostActiveSite,
+	)
+
+	siteName := mostActiveSite["branch_name"]
+	consumptionCount := mostActiveSite["batch_count"]
+
+	if siteName != nil {
+		explanation += fmt.Sprintf(
+			"%v currently accounts for %v consumptions and remains the busiest operational site. ",
+			siteName,
+			consumptionCount,
+		)
+	}
+
+	explanation += fmt.Sprintf(
+		"Daily planning also appears complete because there are %d finalized plans and %d drafts pending.",
+		context.KPIs.FinalizedDailyPlans,
+		context.KPIs.DraftDailyPlans,
+	)
+
+	return explanation
+}
+
+func BuildExecutiveSummaryRecommendation(
+	context ExecutiveAIContext,
+) string {
+
+	recommendation := "Management should focus on operational concentration and recipe variance control. "
+
+	mostActiveSiteBytes, _ := json.Marshal(
+		context.Highlights.MostActiveBranch,
+	)
+
+	var mostActiveSite map[string]any
+
+	json.Unmarshal(
+		mostActiveSiteBytes,
+		&mostActiveSite,
+	)
+
+	siteName := mostActiveSite["branch_name"]
+
+	if siteName != nil {
+		recommendation += fmt.Sprintf(
+			"%v currently carries the highest operational activity and should be monitored for workload balance and operational resilience. ",
+			siteName,
+		)
+	}
+
+	if len(context.TopRecipeVariance) > 0 {
+		recommendation += fmt.Sprintf(
+			"%s should also be reviewed because it recorded the highest recipe variance at %.1f%%.",
+			context.TopRecipeVariance[0].RecipeName,
+			context.TopRecipeVariance[0].VariancePercent,
+		)
+	}
+
+	return recommendation
 }

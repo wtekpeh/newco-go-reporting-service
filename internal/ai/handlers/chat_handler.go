@@ -306,6 +306,8 @@ func (h *AIChatHandler) Chat(c *fiber.Ctx) error {
 
 	chartData := map[string]interface{}{}
 
+	operationalContext := ""
+
 	if classification.ToolName == "top_recipe_variance" {
 
 		branchID := ""
@@ -838,10 +840,15 @@ Approved operational facts:
 			executiveRequest.BranchID = request.BranchID
 		}
 
-		executiveContext, err := h.ContextBuilder.BuildExecutiveSummaryContext(
+		_, aiContext, err := h.ContextBuilder.BuildExecutiveSummaryContext(
 			c.UserContext(),
 			executiveRequest,
 		)
+
+		operationalContext = services.BuildExecutiveSummaryNarrative(
+			aiContext,
+		)
+
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"message": "failed to build executive summary context",
@@ -849,50 +856,22 @@ Approved operational facts:
 			})
 		}
 
-		systemPrompt := `
-You are NewCo's executive operations assistant.
+		if conversationReasoningMode == "explanation" {
 
-Do not show your reasoning.
-Do not explain your thinking process.
-Give only the final answer.
+			assistantResponse = services.BuildExecutiveSummaryExplanation(
+				aiContext,
+			)
 
-Use ONLY approved operational facts.
+		} else if conversationReasoningMode == "recommendation" {
 
-Use business terminology:
-- Say "consumption" instead of "batch".
-- Say "site" instead of "branch".
+			assistantResponse = services.BuildExecutiveSummaryRecommendation(
+				aiContext,
+			)
 
-Do not invent numbers.
-Be concise, executive-level, and conversational.
-`
+		} else {
 
-		userPrompt := `
-User question:
-` + request.Message + `
-
-Interpretation rules:
-- Focus on operational performance, planning, staffing, and risk.
-- Highlight important operational insights carefully.
-- Do not exaggerate risks.
-- If actual value is 0, treat it as not recorded yet unless explicitly marked as a finalized actual discrepancy.
-- Do not call missing actuals a gap, loss, issue, variance, or failure automatically.
-
-Approved operational facts:
-` + executiveContext
-
-		content, err := h.Ollama.Chat(
-			c.UserContext(),
-			systemPrompt,
-			userPrompt,
-		)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "failed to generate executive AI response",
-				"error":   err.Error(),
-			})
+			assistantResponse = operationalContext
 		}
-
-		assistantResponse = content
 
 		chartSuggestions = append(chartSuggestions, dto.AIChartSuggestion{
 			ChartType: "line",
@@ -937,6 +916,8 @@ Approved operational facts:
 			BranchID: request.BranchID,
 
 			AssistantResponse: assistantResponse,
+
+			OperationalContext: operationalContext,
 
 			CreatedAt: time.Now(),
 		},

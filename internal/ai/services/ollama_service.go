@@ -36,7 +36,21 @@ func (s *OllamaService) Chat(
 	userPrompt string,
 ) (string, error) {
 
-	userPrompt = "/no_think\nReturn only the final answer. Do not show reasoning, analysis, planning, or thinking.\n\n" + userPrompt
+	systemPrompt = systemPrompt + `
+
+IMPORTANT RESPONSE RULES:
+
+- Never expose chain-of-thought reasoning.
+- Never expose internal analysis steps.
+- Never narrate how you are thinking.
+- Never mention "approved facts", "interpretation rules", "the user said", or "I should".
+- Respond directly as an executive operations assistant.
+- Use polished, concise management-ready language.
+- Use bullets when summarizing several operational points.
+- Never invent operational values or metrics.
+`
+
+	userPrompt = "/no_think\nReturn only the final answer. Do not show reasoning, analysis, planning, or thinking. Write a polished executive-ready response only.\n\n" + userPrompt
 	think := false
 
 	requestBody := dto.OllamaChatRequest{
@@ -112,7 +126,32 @@ func cleanAssistantContent(content string) string {
 	cleaned = strings.ReplaceAll(cleaned, "<think>", "")
 	cleaned = strings.ReplaceAll(cleaned, "</think>", "")
 
-	lines := strings.Split(cleaned, "\n")
+	lines := strings.Split(content, "\n")
+
+	reasoningMarkers := []string{
+		"steps:",
+		"response structure:",
+		"operational facts summary:",
+		"key kpis:",
+		"approach:",
+		"how to structure:",
+		"we have to",
+		"we can do:",
+		"the response must",
+		"using \"branch\"",
+		"using \"batch\"",
+	}
+
+	lowerContent := strings.ToLower(content)
+
+	for _, marker := range reasoningMarkers {
+		index := strings.Index(lowerContent, marker)
+
+		if index != -1 {
+			content = content[index+len(marker):]
+			lowerContent = strings.ToLower(content)
+		}
+	}
 
 	filteredLines := []string{}
 
@@ -142,6 +181,46 @@ func cleanAssistantContent(content string) string {
 		"the approved facts do not",
 		"therefore",
 		"possible next steps",
+		"total active users",
+		"highlights:",
+		"top recipe variance",
+		"need to structure",
+		"mention that",
+		"start with",
+		"the variance",
+		"this is",
+		"key points from",
+		"- reporting period:",
+		"- kpis:",
+		"- highlights:",
+		"- top_recipe_variance:",
+		"- use business terminology",
+		"- be concise",
+		"- use bullets",
+		"- do not invent",
+		"- do not call",
+		"important:",
+		"we are to focus on:",
+		"we have to be careful:",
+		"for the top_recipe_variance",
+		"the reporting period",
+		"branch becomes",
+		"consumption becomes",
+		"highlights mention",
+		"let me",
+		"the ingredient categories",
+		"also,",
+		"so ",
+		"wait,",
+		"maybe ",
+		"steps:",
+		"operational facts summary:",
+		"approach:",
+		"how to structure:",
+		"key kpis:",
+		"3.",
+		"2.",
+		"1.",
 	}
 
 	for _, line := range lines {
@@ -175,8 +254,7 @@ func cleanAssistantContent(content string) string {
 
 	// Safety fallback
 	if finalResponse == "" {
-		return strings.TrimSpace(content)
+		return "I could not generate a clean operational response."
 	}
-
 	return finalResponse
 }
