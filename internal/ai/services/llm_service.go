@@ -8,29 +8,30 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"newco-go-reporting-service/internal/ai/dto"
 )
 
-type OllamaService struct {
+type LLMService struct {
 	BaseURL string
+	APIKey  string
 	Model   string
 	Client  *http.Client
 }
 
-func NewOllamaService(
+func NewLLMService(
 	baseURL string,
+	apiKey string,
 	model string,
-) *OllamaService {
+) *LLMService {
 
-	return &OllamaService{
+	return &LLMService{
 		BaseURL: baseURL,
+		APIKey:  apiKey,
 		Model:   model,
 		Client:  &http.Client{},
 	}
 }
 
-func (s *OllamaService) Chat(
+func (s *LLMService) Chat(
 	ctx context.Context,
 	systemPrompt string,
 	userPrompt string,
@@ -51,26 +52,21 @@ IMPORTANT RESPONSE RULES:
 `
 
 	userPrompt = "/no_think\nReturn only the final answer. Do not show reasoning, analysis, planning, or thinking. Write a polished executive-ready response only.\n\n" + userPrompt
-	think := false
 
-	requestBody := dto.OllamaChatRequest{
-		Model:  s.Model,
-		Stream: false,
-		Think:  &think,
-		Options: map[string]interface{}{
-			"num_predict": 500,
-			"temperature": 0.1,
-		},
-		Messages: []dto.OllamaMessage{
+	requestBody := map[string]any{
+		"model": s.Model,
+		"messages": []map[string]string{
 			{
-				Role:    "system",
-				Content: systemPrompt,
+				"role":    "system",
+				"content": systemPrompt,
 			},
 			{
-				Role:    "user",
-				Content: userPrompt,
+				"role":    "user",
+				"content": userPrompt,
 			},
 		},
+		"temperature": 0.1,
+		"max_tokens":  500,
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
@@ -81,14 +77,22 @@ IMPORTANT RESPONSE RULES:
 	request, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		fmt.Sprintf("%s/api/chat", s.BaseURL),
+		s.BaseURL,
 		bytes.NewBuffer(jsonBody),
 	)
 	if err != nil {
 		return "", err
 	}
 
-	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	request.Header.Set(
+		"Authorization",
+		"Bearer "+s.APIKey,
+	)
 
 	response, err := s.Client.Do(request)
 	if err != nil {
@@ -103,20 +107,37 @@ IMPORTANT RESPONSE RULES:
 
 	if response.StatusCode != http.StatusOK {
 		return "", fmt.Errorf(
-			"ollama returned status %d: %s",
+			"openai returned status %d: %s",
 			response.StatusCode,
 			string(responseBody),
 		)
 	}
 
-	var ollamaResponse dto.OllamaChatResponse
+	var openAIResponse struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
 
-	err = json.Unmarshal(responseBody, &ollamaResponse)
+	err = json.Unmarshal(
+		responseBody,
+		&openAIResponse,
+	)
 	if err != nil {
 		return "", err
 	}
 
-	return cleanAssistantContent(ollamaResponse.Message.Content), nil
+	if len(openAIResponse.Choices) == 0 {
+		return "", fmt.Errorf(
+			"no choices returned from OpenAI",
+		)
+	}
+
+	return cleanAssistantContent(
+		openAIResponse.Choices[0].Message.Content,
+	), nil
 }
 
 func cleanAssistantContent(content string) string {

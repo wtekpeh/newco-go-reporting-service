@@ -149,6 +149,9 @@ const AIBranchPerformanceQuery = `
 		AND ($1 = '' OR cb.used_date >= $1::date)
 		AND ($2 = '' OR cb.used_date <= $2::date)
 
+	WHERE b.is_active = TRUE
+	  AND ($3 = '' OR b.id::text = $3)
+
 	GROUP BY b.id, b.name
 
 	ORDER BY distinct_batches DESC,

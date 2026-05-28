@@ -54,9 +54,10 @@ func Register(
 		log.Fatal(err)
 	}
 
-	ollamaService := aiservices.NewOllamaService(
-		cfg.OllamaBaseURL,
-		cfg.OllamaModel,
+	llmService := aiservices.NewLLMService(
+		cfg.OpenAIBaseURL,
+		cfg.OpenAIAPIKey,
+		cfg.OpenAIModel,
 	)
 
 	executiveContextBuilder := aiservices.NewExecutiveContextBuilder(
@@ -66,7 +67,7 @@ func Register(
 	chatMemoryStore := aiservices.NewChatMemoryStore()
 
 	intentClassifier := aiservices.NewIntentClassifier(
-		ollamaService,
+		llmService,
 		chatMemoryStore,
 	)
 
@@ -74,7 +75,7 @@ func Register(
 
 	aiChatHandler := aihandlers.NewAIChatHandler(
 		intentClassifier,
-		ollamaService,
+		llmService,
 		reportService,
 		chatMemoryStore,
 		executiveContextBuilder,
@@ -82,7 +83,7 @@ func Register(
 	)
 
 	executiveAIHandler := aihandlers.NewExecutiveAIHandler(
-		ollamaService,
+		llmService,
 		executiveContextBuilder,
 	)
 

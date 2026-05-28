@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"newco-go-reporting-service/internal/ai/dto"
@@ -17,19 +18,27 @@ type IntentRule struct {
 }
 
 type IntentClassifier struct {
-	Ollama      *OllamaService
+	llm         *LLMService
 	MemoryStore *ChatMemoryStore
+}
+
+type LLMIntentResponse struct {
+	Intent             string `json:"intent"`
+	ToolName           string `json:"tool_name"`
+	ReasoningMode      string `json:"reasoning_mode"`
+	NeedsChart         bool   `json:"needs_chart"`
+	PreferredChartType string `json:"preferred_chart_type"`
 }
 
 const minimumRuleConfidence = 0.10
 
 func NewIntentClassifier(
-	ollama *OllamaService,
+	llm *LLMService,
 	memoryStore *ChatMemoryStore,
 ) *IntentClassifier {
 
 	return &IntentClassifier{
-		Ollama:      ollama,
+		llm:         llm,
 		MemoryStore: memoryStore,
 	}
 }
@@ -217,6 +226,25 @@ func (c *IntentClassifier) Classify(
 
 	recentTurns := c.MemoryStore.RecentTurns(sessionID)
 
+	llmClassification, err := c.classifyWithLLM(
+		ctx,
+		message,
+		recentTurns,
+	)
+
+	if err == nil && IsApprovedAITool(llmClassification.ToolName) {
+		return &dto.AIIntentClassification{
+			Intent:               llmClassification.Intent,
+			ToolName:             llmClassification.ToolName,
+			ReasoningMode:        llmClassification.ReasoningMode,
+			NeedsChart:           llmClassification.NeedsChart,
+			ChartType:            "",
+			Reason:               "classified by LLM router",
+			ConfidenceScore:      0.95,
+			ClassificationSource: "llm_router",
+		}, nil
+	}
+
 	if len(recentTurns) > 0 {
 		lastTurn := recentTurns[len(recentTurns)-1]
 
@@ -257,6 +285,7 @@ func (c *IntentClassifier) Classify(
 	}
 
 	bestScore := 0
+
 	var bestRule *IntentRule
 
 	for i := range intentRules {
@@ -383,7 +412,7 @@ Required JSON shape:
 }
 `
 
-	content, err := c.Ollama.Chat(
+	content, err := c.llm.Chat(
 		ctx,
 		systemPrompt,
 		userPrompt,
@@ -423,4 +452,135 @@ Required JSON shape:
 	}
 
 	return &result, nil
+}
+
+func (c *IntentClassifier) classifyWithLLM(
+	ctx context.Context,
+	message string,
+	recentTurns []dto.AIConversationTurn,
+) (LLMIntentResponse, error) {
+
+	conversationContext := ""
+
+	if len(recentTurns) > 0 {
+
+		lastTurn := recentTurns[len(recentTurns)-1]
+
+		conversationContext = fmt.Sprintf(
+			`
+Previous Intent: %s
+Previous Tool: %s
+Previous Assistant Response:
+%s
+`,
+			lastTurn.Intent,
+			lastTurn.ToolName,
+			lastTurn.AssistantResponse,
+		)
+	}
+
+	systemPrompt := `
+You are an operational AI routing assistant.
+
+Your job is ONLY to determine:
+- operational intent
+- approved tool
+- reasoning mode
+- whether a chart is useful
+- preferred chart type
+
+You MUST ONLY return valid JSON.
+
+Approved tools:
+- executive_summary
+- branch_summary
+- ingredient_variance_risk
+- planning_risk_summary
+- none
+
+Reasoning modes:
+- summary
+- explanation
+- recommendation
+
+Chart types:
+- bar
+- line
+- pie
+- none
+
+If the user asks for:
+- chart
+- graph
+- bar graph
+- line graph
+- visualize
+- compare visually
+
+then:
+- needs_chart should be true
+- choose the best chart type
+
+Examples:
+
+User:
+"Which site is overloaded?"
+
+Response:
+{
+  "intent": "branch_performance",
+  "tool_name": "branch_summary",
+  "reasoning_mode": "summary",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"why so"
+
+Response:
+{
+  "intent": "follow_up",
+  "tool_name": "branch_summary",
+  "reasoning_mode": "explanation",
+  "needs_chart": false
+}
+
+Return ONLY JSON.
+`
+
+	userPrompt := fmt.Sprintf(
+		`
+Conversation Context:
+%s
+
+Current User Message:
+%s
+`,
+		conversationContext,
+		message,
+	)
+
+	response, err := c.llm.Chat(
+		ctx,
+		systemPrompt,
+		userPrompt,
+	)
+
+	if err != nil {
+		return LLMIntentResponse{}, err
+	}
+
+	var parsedResponse LLMIntentResponse
+
+	err = json.Unmarshal(
+		[]byte(response),
+		&parsedResponse,
+	)
+
+	if err != nil {
+		return LLMIntentResponse{}, err
+	}
+
+	return parsedResponse, nil
 }

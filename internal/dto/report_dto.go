@@ -280,3 +280,8 @@ type AIIngredientVarianceRiskDTO struct {
 	RiskReasons         []string                          `json:"risk_reasons"`
 	ManagementAttention []string                          `json:"management_attention"`
 }
+
+type BranchLookupDTO struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}

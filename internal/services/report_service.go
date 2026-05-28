@@ -839,3 +839,12 @@ func (s *ReportService) GetAIIngredientVarianceRisk(
 
 	return s.Repo.GetAIIngredientVarianceRisk(filters)
 }
+
+func (s *ReportService) GetBranchByName(
+	name string,
+) (dto.BranchLookupDTO, error) {
+
+	return s.Repo.GetBranchByName(
+		name,
+	)
+}

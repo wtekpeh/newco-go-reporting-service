@@ -499,6 +499,43 @@ func (r *ReportRepository) GetBranches() ([]dto.BranchItemDTO, error) {
 	return items, nil
 }
 
+func (r *ReportRepository) GetBranchByName(
+	name string,
+) (dto.BranchLookupDTO, error) {
+
+	query := `
+		SELECT
+			id,
+			name
+		FROM accounts_branch
+		WHERE is_active = TRUE
+		  AND name ILIKE '%' || $1 || '%'
+		ORDER BY name ASC
+		LIMIT 1
+	`
+
+	var branch dto.BranchLookupDTO
+
+	err := r.DB.QueryRow(
+		context.Background(),
+		query,
+		name,
+	).Scan(
+		&branch.ID,
+		&branch.Name,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return dto.BranchLookupDTO{}, nil
+		}
+
+		return dto.BranchLookupDTO{}, err
+	}
+
+	return branch, nil
+}
+
 func (r *ReportRepository) GetIngredientCategoryDaily(
 	ctx context.Context,
 	startDate time.Time,
@@ -817,6 +854,7 @@ func (r *ReportRepository) AIBranchPerformance(
 		queries.AIBranchPerformanceQuery,
 		filters.StartDate,
 		filters.EndDate,
+		filters.BranchID,
 	)
 	if err != nil {
 		return nil, err

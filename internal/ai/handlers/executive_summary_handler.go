@@ -9,12 +9,12 @@ import (
 )
 
 type ExecutiveAIHandler struct {
-	Ollama         *services.OllamaService
+	Ollama         *services.LLMService
 	ContextBuilder *services.ExecutiveContextBuilder
 }
 
 func NewExecutiveAIHandler(
-	ollama *services.OllamaService,
+	ollama *services.LLMService,
 	contextBuilder *services.ExecutiveContextBuilder,
 ) *ExecutiveAIHandler {
 

@@ -5,6 +5,8 @@ type AIIntentClassification struct {
 
 	ToolName string `json:"tool_name"`
 
+	ReasoningMode string `json:"reasoning_mode"`
+
 	NeedsChart bool `json:"needs_chart"`
 
 	ChartType string `json:"chart_type,omitempty"`

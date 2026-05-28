@@ -17,7 +17,7 @@ import (
 
 type AIChatHandler struct {
 	IntentClassifier *services.IntentClassifier
-	Ollama           *services.OllamaService
+	Ollama           *services.LLMService
 	ReportService    *reportservices.ReportService
 	MemoryStore      *services.ChatMemoryStore
 	ContextBuilder   *services.ExecutiveContextBuilder
@@ -135,7 +135,7 @@ func formatStructuredAIResponse(rawContent string) string {
 
 func NewAIChatHandler(
 	intentClassifier *services.IntentClassifier,
-	ollama *services.OllamaService,
+	ollama *services.LLMService,
 	reportService *reportservices.ReportService,
 	memoryStore *services.ChatMemoryStore,
 	contextBuilder *services.ExecutiveContextBuilder,
@@ -237,6 +237,24 @@ func (h *AIChatHandler) Chat(c *fiber.Ctx) error {
 		request.SessionID,
 	)
 
+	if request.BranchID == nil {
+		branches, err := h.ReportService.GetBranches()
+
+		if err == nil {
+			messageLower := strings.ToLower(request.Message)
+
+			for _, branch := range branches {
+				branchNameLower := strings.ToLower(branch.Name)
+
+				if strings.Contains(messageLower, branchNameLower) {
+					branchID := int64(branch.ID)
+					request.BranchID = &branchID
+					break
+				}
+			}
+		}
+	}
+
 	if len(recentTurns) > 0 {
 
 		lastTurn := recentTurns[len(recentTurns)-1]
@@ -288,9 +306,13 @@ func (h *AIChatHandler) Chat(c *fiber.Ctx) error {
 		conversationFocus = lastTurn.Focus
 	}
 
-	conversationReasoningMode := determineReasoningMode(
-		request.Message,
-	)
+	conversationReasoningMode := classification.ReasoningMode
+
+	if conversationReasoningMode == "" {
+		conversationReasoningMode = determineReasoningMode(
+			request.Message,
+		)
+	}
 
 	if conversationReasoningMode == "detection" && len(recentTurns) > 0 {
 		lastTurn := recentTurns[len(recentTurns)-1]
@@ -307,6 +329,19 @@ func (h *AIChatHandler) Chat(c *fiber.Ctx) error {
 	chartData := map[string]interface{}{}
 
 	operationalContext := ""
+
+	extractedFilters := services.ExtractFiltersFromMessage(
+		request.Message,
+		time.Now(),
+	)
+
+	if request.StartDate == "" {
+		request.StartDate = extractedFilters.StartDate
+	}
+
+	if request.EndDate == "" {
+		request.EndDate = extractedFilters.EndDate
+	}
 
 	if classification.ToolName == "top_recipe_variance" {
 
@@ -500,6 +535,7 @@ Approved operational facts:
 		}
 
 		branchSummary, err := h.ReportService.AIBranchPerformance(filters)
+
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"message": "failed to fetch branch summary",
@@ -514,70 +550,59 @@ Approved operational facts:
 			})
 		}
 
-		if (assistantResponse == "" ||
-			assistantResponse == "No tool execution implemented yet.") &&
-			len(branchSummary) > 0 {
-
-			topSite := branchSummary[0]
-
-			if conversationFocus == "best_performing_site" {
-
-				if conversationReasoningMode == "explanation" {
-
-					assistantResponse = fmt.Sprintf(
-						"%s is performing best because it recorded the highest consumption activity during the selected period, with %d consumptions compared with the other sites.",
-						topSite.BranchName,
-						topSite.TotalBatches,
-					)
-
-				} else {
-
-					assistantResponse = fmt.Sprintf(
-						"%s is currently performing best with %d consumptions recorded during the selected period.",
-						topSite.BranchName,
-						topSite.TotalBatches,
-					)
-				}
-
-			} else if conversationFocus == "overloaded_site" {
-
-				if conversationReasoningMode == "recommendation" {
-
-					assistantResponse = fmt.Sprintf(
-						"Management should review workload distribution immediately. %s is handling %d consumptions with only %d staff, while the other sites recorded little or no activity. The next step is to check whether some work or support can be moved to underutilized sites.",
-						topSite.BranchName,
-						topSite.TotalBatches,
-						topSite.StaffCount,
-					)
-
-				} else if conversationReasoningMode == "explanation" {
-
-					assistantResponse = fmt.Sprintf(
-						"%s appears overloaded because it handled %d consumptions with only %d staff, while the other sites recorded little or no activity during the selected period.",
-						topSite.BranchName,
-						topSite.TotalBatches,
-						topSite.StaffCount,
-					)
-
-				} else {
-
-					assistantResponse = fmt.Sprintf(
-						"%s appears operationally overloaded with %d consumptions handled by %d staff.",
-						topSite.BranchName,
-						topSite.TotalBatches,
-						topSite.StaffCount,
-					)
-				}
-
-			} else {
-
-				assistantResponse = fmt.Sprintf(
-					"%s is the most active site with %d consumptions recorded during the selected period.",
-					topSite.BranchName,
-					topSite.TotalBatches,
-				)
-			}
+		jsonBytes, err := json.MarshalIndent(
+			branchSummary,
+			"",
+			"  ",
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to marshal branch summary",
+				"error":   err.Error(),
+			})
 		}
+
+		systemPrompt := `
+You are NewCo's operational intelligence assistant.
+
+Answer naturally using only the approved tool result.
+Do not invent numbers.
+Use "site" instead of "branch".
+Use "consumption" instead of "batch".
+If the user asks why, explain the evidence.
+If the user asks what management should do, give practical management actions.
+Keep the answer concise and operational.
+`
+
+		userPrompt := fmt.Sprintf(
+			`
+User message:
+%s
+
+Reasoning mode:
+%s
+
+Tool result:
+%s
+`,
+			request.Message,
+			conversationReasoningMode,
+			string(jsonBytes),
+		)
+
+		content, err := h.Ollama.Chat(
+			c.UserContext(),
+			systemPrompt,
+			userPrompt,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to generate branch performance response",
+				"error":   err.Error(),
+			})
+		}
+
+		assistantResponse = content
 
 		chartData["branch_summary"] = branchSummary
 

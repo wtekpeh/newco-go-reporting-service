@@ -15,8 +15,9 @@ type Config struct {
 	KeycloakRealm     string
 	KeycloakClientID  string
 
-	OllamaBaseURL string
-	OllamaModel   string
+	OpenAIBaseURL string
+	OpenAIAPIKey  string
+	OpenAIModel   string
 }
 
 func getEnv(key, fallback string) string {
@@ -41,7 +42,19 @@ func Load() *Config {
 		KeycloakRealm:     getEnv("KEYCLOAK_REALM", ""),
 		KeycloakClientID:  getEnv("KEYCLOAK_CLIENT_ID", ""),
 
-		OllamaBaseURL: getEnv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
-		OllamaModel:   getEnv("OLLAMA_MODEL", "qwen3:4b"),
+		OpenAIBaseURL: getEnv(
+			"OPENAI_BASE_URL",
+			"https://api.openai.com/v1/chat/completions",
+		),
+
+		OpenAIAPIKey: getEnv(
+			"OPENAI_API_KEY",
+			"",
+		),
+
+		OpenAIModel: getEnv(
+			"OPENAI_MODEL",
+			"gpt-4.1-mini",
+		),
 	}
 }
