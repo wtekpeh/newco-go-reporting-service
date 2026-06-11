@@ -324,6 +324,30 @@ func (h *AIChatHandler) Chat(c *fiber.Ctx) error {
 
 	assistantResponse := "No tool execution implemented yet."
 
+	if classification.ToolName == "conversational" {
+
+		systemPrompt := `
+You are a friendly business assistant.
+
+Respond naturally to greetings, thanks,
+acknowledgements and conversational messages.
+
+Keep responses short and professional.
+`
+
+		content, err := h.Ollama.Chat(
+			c.UserContext(),
+			systemPrompt,
+			request.Message,
+		)
+
+		if err != nil {
+			assistantResponse = "You're welcome."
+		} else {
+			assistantResponse = content
+		}
+	}
+
 	chartSuggestions := []dto.AIChartSuggestion{}
 
 	chartData := map[string]interface{}{}

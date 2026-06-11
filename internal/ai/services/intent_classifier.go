@@ -496,6 +496,7 @@ Approved tools:
 - branch_summary
 - ingredient_variance_risk
 - planning_risk_summary
+- conversational
 - none
 
 Reasoning modes:
@@ -520,6 +521,15 @@ If the user asks for:
 then:
 - needs_chart should be true
 - choose the best chart type
+
+For greetings, thanks, acknowledgements, or small talk, use:
+{
+  "intent": "conversation",
+  "tool_name": "conversational",
+  "reasoning_mode": "summary",
+  "needs_chart": false,
+  "preferred_chart_type": "none"
+}
 
 Examples:
 

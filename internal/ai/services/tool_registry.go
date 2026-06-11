@@ -44,6 +44,11 @@ var ApprovedAITools = map[string]AIToolDefinition{
 		Intent:      "ingredient_variance_risk",
 		Description: "Ingredient planned versus actual consumption variance risk and management attention areas.",
 	},
+	"conversational": {
+		Name:        "conversational",
+		Intent:      "conversation",
+		Description: "Greetings, acknowledgements, thanks, and general conversational replies that do not require a business intelligence tool.",
+	},
 	"none": {
 		Name:        "none",
 		Intent:      "general_advice",
