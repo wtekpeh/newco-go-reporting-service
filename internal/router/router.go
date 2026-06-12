@@ -60,6 +60,11 @@ func Register(
 		cfg.OpenAIModel,
 	)
 
+	internetSearchService := aiservices.NewInternetSearchService(
+		cfg.TavilyBaseURL,
+		cfg.TavilyAPIKey,
+	)
+
 	executiveContextBuilder := aiservices.NewExecutiveContextBuilder(
 		reportService,
 	)
@@ -76,6 +81,7 @@ func Register(
 	aiChatHandler := aihandlers.NewAIChatHandler(
 		intentClassifier,
 		llmService,
+		internetSearchService,
 		reportService,
 		chatMemoryStore,
 		executiveContextBuilder,
@@ -146,7 +152,6 @@ func Register(
 	ai := app.Group(
 		"/ai",
 		authMiddleware.RequireAuth(),
-		authMiddleware.RequireExecutive(),
 	)
 
 	ai.Post(

@@ -16,12 +16,13 @@ import (
 )
 
 type AIChatHandler struct {
-	IntentClassifier *services.IntentClassifier
-	Ollama           *services.LLMService
-	ReportService    *reportservices.ReportService
-	MemoryStore      *services.ChatMemoryStore
-	ContextBuilder   *services.ExecutiveContextBuilder
-	PromptBuilder    *services.PromptBuilder
+	IntentClassifier      *services.IntentClassifier
+	Ollama                *services.LLMService
+	ReportService         *reportservices.ReportService
+	MemoryStore           *services.ChatMemoryStore
+	ContextBuilder        *services.ExecutiveContextBuilder
+	PromptBuilder         *services.PromptBuilder
+	InternetSearchService *services.InternetSearchService
 }
 
 type AIStructuredResponse struct {
@@ -136,6 +137,7 @@ func formatStructuredAIResponse(rawContent string) string {
 func NewAIChatHandler(
 	intentClassifier *services.IntentClassifier,
 	ollama *services.LLMService,
+	internetSearchService *services.InternetSearchService,
 	reportService *reportservices.ReportService,
 	memoryStore *services.ChatMemoryStore,
 	contextBuilder *services.ExecutiveContextBuilder,
@@ -143,12 +145,13 @@ func NewAIChatHandler(
 ) *AIChatHandler {
 
 	return &AIChatHandler{
-		IntentClassifier: intentClassifier,
-		Ollama:           ollama,
-		ReportService:    reportService,
-		MemoryStore:      memoryStore,
-		ContextBuilder:   contextBuilder,
-		PromptBuilder:    promptBuilder,
+		IntentClassifier:      intentClassifier,
+		Ollama:                ollama,
+		ReportService:         reportService,
+		MemoryStore:           memoryStore,
+		ContextBuilder:        contextBuilder,
+		PromptBuilder:         promptBuilder,
+		InternetSearchService: internetSearchService,
 	}
 }
 
@@ -231,6 +234,26 @@ func (h *AIChatHandler) Chat(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "message is required",
 		})
+	}
+
+	accessContextValue := c.Locals("access_context")
+
+	if accessContextValue != nil {
+
+		accessContext, ok := accessContextValue.(*reportdto.AccessContext)
+
+		if ok {
+
+			if !accessContext.IsExecutive {
+
+				if len(accessContext.BranchIDs) > 0 {
+
+					branchID := accessContext.BranchIDs[0]
+
+					request.BranchID = &branchID
+				}
+			}
+		}
 	}
 
 	recentTurns := h.MemoryStore.RecentTurns(
@@ -639,6 +662,116 @@ Tool result:
 		})
 	}
 
+	if classification.ToolName == "site_staff_load" {
+
+		filters := reportdto.ReportFiltersDTO{
+			StartDate: request.StartDate,
+			EndDate:   request.EndDate,
+		}
+
+		if request.BranchID != nil {
+			filters.BranchID = strconv.FormatInt(
+				*request.BranchID,
+				10,
+			)
+		}
+
+		branchSummary, err := h.ReportService.AIBranchPerformance(
+			filters,
+		)
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to fetch site staff load",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		jsonBytes, err := json.MarshalIndent(
+			branchSummary,
+			"",
+			"  ",
+		)
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to marshal site staff load",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		systemPrompt := `
+You are NewCo's workforce planning assistant.
+
+Use only the provided tool result.
+
+Calculate:
+- workload per staff member
+- overloaded sites
+- understaffed sites
+- staffing observations
+
+Do not invent numbers.
+
+Use:
+site
+staff
+consumption
+
+instead of technical database terms.
+`
+
+		userPrompt := fmt.Sprintf(
+			`
+User message:
+%s
+
+Reasoning mode:
+%s
+
+Tool result:
+%s
+`,
+			request.Message,
+			conversationReasoningMode,
+			string(jsonBytes),
+		)
+
+		content, err := h.Ollama.Chat(
+			c.UserContext(),
+			systemPrompt,
+			userPrompt,
+		)
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to generate site staff load response",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		assistantResponse = content
+
+		chartData["site_staff_load"] = branchSummary
+
+		chartSuggestions = append(
+			chartSuggestions,
+			dto.AIChartSuggestion{
+				ChartType: "bar",
+				Title:     "Site Staff Load",
+				Dataset:   "site_staff_load",
+				XField:    "branch_name",
+				YField:    "staff_count",
+			},
+		)
+	}
+
 	if classification.ToolName == "planning_risk_summary" {
 
 		filters := reportdto.ReportFiltersDTO{
@@ -795,6 +928,274 @@ Tool result:
 		})
 	}
 
+	if classification.ToolName == "management_action_summary" {
+
+		filters := reportdto.ReportFiltersDTO{
+			StartDate: request.StartDate,
+			EndDate:   request.EndDate,
+		}
+
+		if request.BranchID != nil {
+			filters.BranchID = strconv.FormatInt(
+				*request.BranchID,
+				10,
+			)
+		}
+
+		branchSummary, err := h.ReportService.AIBranchPerformance(
+			filters,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to fetch site performance for management action summary",
+				"error":   err.Error(),
+			})
+		}
+
+		planningRiskSummary, err := h.ReportService.GetAIPlanningRiskSummary(
+			filters,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to fetch planning risk for management action summary",
+				"error":   err.Error(),
+			})
+		}
+
+		ingredientVarianceRisk, err := h.ReportService.GetAIIngredientVarianceRisk(
+			filters,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to fetch ingredient variance for management action summary",
+				"error":   err.Error(),
+			})
+		}
+
+		combinedResult := map[string]any{
+			"site_performance":         branchSummary,
+			"planning_risk_summary":    planningRiskSummary,
+			"ingredient_variance_risk": ingredientVarianceRisk,
+		}
+
+		jsonBytes, err := json.MarshalIndent(
+			combinedResult,
+			"",
+			"  ",
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to marshal management action summary",
+				"error":   err.Error(),
+			})
+		}
+
+		systemPrompt := `
+You are NewCo's executive operations advisor.
+
+Use only the approved tool result.
+
+Give management practical actions based on:
+- site workload
+- staffing pressure
+- planning readiness
+- ingredient variance risk
+
+Do not invent numbers.
+Use "site" instead of "branch".
+Use "consumption" instead of "batch".
+Keep the answer concise, direct, and useful for management.
+`
+
+		userPrompt := fmt.Sprintf(
+			`
+User message:
+%s
+
+Reasoning mode:
+%s
+
+Approved tool result:
+%s
+`,
+			request.Message,
+			conversationReasoningMode,
+			string(jsonBytes),
+		)
+
+		content, err := h.Ollama.Chat(
+			c.UserContext(),
+			systemPrompt,
+			userPrompt,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to generate management action summary",
+				"error":   err.Error(),
+			})
+		}
+
+		assistantResponse = content
+
+		chartData["management_action_summary"] = branchSummary
+
+		chartSuggestions = append(chartSuggestions, dto.AIChartSuggestion{
+			ChartType: "bar",
+			Title:     "Management Focus: Site Workload",
+			Dataset:   "management_action_summary",
+			XField:    "branch_name",
+			YField:    "total_batches",
+		})
+	}
+
+	if classification.ToolName == "operational_market_intelligence" {
+
+		filters := reportdto.ReportFiltersDTO{
+			StartDate: request.StartDate,
+			EndDate:   request.EndDate,
+		}
+
+		if request.BranchID != nil {
+			filters.BranchID = strconv.FormatInt(
+				*request.BranchID,
+				10,
+			)
+		}
+
+		branchSummary, err := h.ReportService.AIBranchPerformance(
+			filters,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to fetch site performance",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		planningRiskSummary, err := h.ReportService.GetAIPlanningRiskSummary(
+			filters,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to fetch planning risks",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		ingredientVarianceRisk, err := h.ReportService.GetAIIngredientVarianceRisk(
+			filters,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to fetch ingredient variance risks",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		searchResponse, err := h.InternetSearchService.Search(
+			c.UserContext(),
+			"food inflation Ghana cooking oil prices Ghana rice market Ghana supply chain risks Ghana catering industry risks",
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to fetch external market intelligence",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		combinedResult := map[string]any{
+			"site_performance":         branchSummary,
+			"planning_risk_summary":    planningRiskSummary,
+			"ingredient_variance_risk": ingredientVarianceRisk,
+			"market_intelligence":      searchResponse,
+		}
+
+		jsonBytes, err := json.MarshalIndent(
+			combinedResult,
+			"",
+			"  ",
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to marshal operational market intelligence",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		systemPrompt := `
+You are NewCo's strategic operations advisor.
+
+You have:
+1. Internal operational intelligence
+2. External market intelligence
+
+Identify:
+- operational risks
+- staffing risks
+- ingredient risks
+- market risks
+- supply chain risks
+
+Recommend concrete management actions.
+
+Do not invent numbers.
+Use only the supplied information.
+Use "site" instead of "branch".
+Use "consumption" instead of "batch".
+`
+
+		userPrompt := fmt.Sprintf(
+			`
+User message:
+%s
+
+Combined intelligence:
+%s
+`,
+			request.Message,
+			string(jsonBytes),
+		)
+
+		content, err := h.Ollama.Chat(
+			c.UserContext(),
+			systemPrompt,
+			userPrompt,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"message": "failed to generate operational market intelligence",
+					"error":   err.Error(),
+				},
+			)
+		}
+
+		assistantResponse = content
+
+		chartData["operational_market_intelligence"] = branchSummary
+
+		chartSuggestions = append(
+			chartSuggestions,
+			dto.AIChartSuggestion{
+				ChartType: "bar",
+				Title:     "Operational & Market Intelligence",
+				Dataset:   "operational_market_intelligence",
+				XField:    "branch_name",
+				YField:    "total_batches",
+			},
+		)
+	}
+
 	if classification.ToolName == "daily_plan_summary" {
 
 		filters := reportdto.ReportFiltersDTO{
@@ -876,6 +1277,71 @@ Approved operational facts:
 		})
 
 		chartData["daily_plan_summary"] = dailyPlanSummary
+	}
+
+	if classification.ToolName == "internet_search" {
+
+		searchResponse, err := h.InternetSearchService.Search(
+			c.UserContext(),
+			request.Message,
+		)
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to perform internet search",
+				"error":   err.Error(),
+			})
+		}
+
+		jsonBytes, err := json.MarshalIndent(
+			searchResponse,
+			"",
+			"  ",
+		)
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to marshal internet search result",
+				"error":   err.Error(),
+			})
+		}
+
+		systemPrompt := `
+You are NewCo's external market intelligence assistant.
+
+Use only the provided internet search results.
+Summarize current external information clearly.
+Mention uncertainty when results are limited.
+Do not invent facts.
+Keep the answer useful for management.
+`
+
+		userPrompt := fmt.Sprintf(
+			`
+User message:
+%s
+
+Internet search result:
+%s
+`,
+			request.Message,
+			string(jsonBytes),
+		)
+
+		content, err := h.Ollama.Chat(
+			c.UserContext(),
+			systemPrompt,
+			userPrompt,
+		)
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "failed to generate internet search response",
+				"error":   err.Error(),
+			})
+		}
+
+		assistantResponse = content
 	}
 
 	if classification.ToolName == "executive_summary" {

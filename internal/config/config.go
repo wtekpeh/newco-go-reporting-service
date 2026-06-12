@@ -18,6 +18,9 @@ type Config struct {
 	OpenAIBaseURL string
 	OpenAIAPIKey  string
 	OpenAIModel   string
+
+	TavilyBaseURL string
+	TavilyAPIKey  string
 }
 
 func getEnv(key, fallback string) string {
@@ -55,6 +58,16 @@ func Load() *Config {
 		OpenAIModel: getEnv(
 			"OPENAI_MODEL",
 			"gpt-4.1-mini",
+		),
+
+		TavilyBaseURL: getEnv(
+			"TAVILY_BASE_URL",
+			"https://api.tavily.com/search",
+		),
+
+		TavilyAPIKey: getEnv(
+			"TAVILY_API_KEY",
+			"",
 		),
 	}
 }

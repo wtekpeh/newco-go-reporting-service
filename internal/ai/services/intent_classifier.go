@@ -107,10 +107,6 @@ var intentRules = []IntentRule{
 			"branch",
 			"performing",
 			"performance",
-			"workload",
-			"overloaded",
-			"staff",
-			"redistribute",
 			"best site",
 			"performing best",
 			"best performing site",
@@ -494,7 +490,11 @@ You MUST ONLY return valid JSON.
 Approved tools:
 - executive_summary
 - branch_summary
+- site_staff_load
 - ingredient_variance_risk
+- management_action_summary
+- operational_market_intelligence
+- internet_search
 - planning_risk_summary
 - conversational
 - none
@@ -532,6 +532,182 @@ For greetings, thanks, acknowledgements, or small talk, use:
 }
 
 Examples:
+
+Internet search examples:
+
+User:
+"What is the current price of cooking oil in Ghana?"
+
+Response:
+{
+  "intent": "internet_search",
+  "tool_name": "internet_search",
+  "reasoning_mode": "summary",
+  "needs_chart": false,
+  "preferred_chart_type": "none"
+}
+
+User:
+"What are food inflation trends in Ghana?"
+
+Response:
+{
+  "intent": "internet_search",
+  "tool_name": "internet_search",
+  "reasoning_mode": "summary",
+  "needs_chart": false,
+  "preferred_chart_type": "none"
+}
+
+User:
+"What external risks should management monitor this month?"
+
+Response:
+{
+  "intent": "internet_search",
+  "tool_name": "internet_search",
+  "reasoning_mode": "recommendation",
+  "needs_chart": false,
+  "preferred_chart_type": "none"
+}
+
+Staff load examples:
+
+Management action examples:
+
+User:
+"What should management focus on?"
+
+Response:
+{
+  "intent": "management_action_summary",
+  "tool_name": "management_action_summary",
+  "reasoning_mode": "recommendation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"What are the biggest operational risks?"
+
+Response:
+{
+  "intent": "management_action_summary",
+  "tool_name": "management_action_summary",
+  "reasoning_mode": "recommendation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+Operational market intelligence examples:
+
+User:
+"Considering our current operations, what external risks should management monitor?"
+
+Response:
+{
+  "intent": "operational_market_intelligence",
+  "tool_name": "operational_market_intelligence",
+  "reasoning_mode": "recommendation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"What market conditions could affect our operations?"
+
+Response:
+{
+  "intent": "operational_market_intelligence",
+  "tool_name": "operational_market_intelligence",
+  "reasoning_mode": "recommendation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"What strategic risks should management prepare for?"
+
+Response:
+{
+  "intent": "operational_market_intelligence",
+  "tool_name": "operational_market_intelligence",
+  "reasoning_mode": "recommendation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"How do external market conditions affect our current operations?"
+
+Response:
+{
+  "intent": "operational_market_intelligence",
+  "tool_name": "operational_market_intelligence",
+  "reasoning_mode": "recommendation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"What actions should management take this week?"
+
+Response:
+{
+  "intent": "management_action_summary",
+  "tool_name": "management_action_summary",
+  "reasoning_mode": "recommendation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"Where should resources be allocated?"
+
+Response:
+{
+  "intent": "management_action_summary",
+  "tool_name": "management_action_summary",
+  "reasoning_mode": "recommendation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"How many staff are in Kumasi Site?"
+
+Response:
+{
+  "intent": "site_staff_load",
+  "tool_name": "site_staff_load",
+  "reasoning_mode": "summary",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"Which site is overloaded?"
+
+Response:
+{
+  "intent": "site_staff_load",
+  "tool_name": "site_staff_load",
+  "reasoning_mode": "summary",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
+
+User:
+"What is the workload per staff member in Accra Site?"
+
+Response:
+{
+  "intent": "site_staff_load",
+  "tool_name": "site_staff_load",
+  "reasoning_mode": "explanation",
+  "needs_chart": true,
+  "preferred_chart_type": "bar"
+}
 
 User:
 "Which site is overloaded?"

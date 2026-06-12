@@ -34,6 +34,21 @@ var ApprovedAITools = map[string]AIToolDefinition{
 		Intent:      "daily_plan_summary",
 		Description: "Daily plan totals, finalized plans, drafts, and planning progress.",
 	},
+	"site_staff_load": {
+		Name:        "site_staff_load",
+		Intent:      "site_staff_load",
+		Description: "Staffing levels, consumptions, workload per staff member, and operational load analysis.",
+	},
+	"management_action_summary": {
+		Name:        "management_action_summary",
+		Intent:      "management_action_summary",
+		Description: "Executive management actions, operational priorities, staffing concerns, planning risks, and variance risks.",
+	},
+	"operational_market_intelligence": {
+		Name:        "operational_market_intelligence",
+		Intent:      "operational_market_intelligence",
+		Description: "Combines internal operational intelligence with external market intelligence to identify strategic risks, market pressures, and management actions.",
+	},
 	"planning_risk_summary": {
 		Name:        "planning_risk_summary",
 		Intent:      "planning_risk_summary",
@@ -43,6 +58,11 @@ var ApprovedAITools = map[string]AIToolDefinition{
 		Name:        "ingredient_variance_risk",
 		Intent:      "ingredient_variance_risk",
 		Description: "Ingredient planned versus actual consumption variance risk and management attention areas.",
+	},
+	"internet_search": {
+		Name:        "internet_search",
+		Intent:      "internet_search",
+		Description: "Search the internet for current market information, industry trends, prices, regulations, external risks, and business intelligence.",
 	},
 	"conversational": {
 		Name:        "conversational",
